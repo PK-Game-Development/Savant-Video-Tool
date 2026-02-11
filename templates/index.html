@@ -556,6 +556,149 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
+        /* Game Log fold-out */
+        .game-log-section {
+            display: none;
+            margin-bottom: 20px;
+        }
+
+        .game-log-section.show { display: block; }
+
+        .game-log-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #111A33;
+            border: 1px solid #1A2844;
+            border-radius: 8px;
+            padding: 14px 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .game-log-toggle:hover { border-color: #F5C842; }
+
+        .game-log-toggle .toggle-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .game-log-toggle .toggle-left span {
+            color: #F5C842;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        .game-log-toggle .toggle-arrow {
+            color: #F5C842;
+            font-size: 14px;
+            transition: transform 0.2s;
+        }
+
+        .game-log-toggle.open .toggle-arrow { transform: rotate(180deg); }
+        .game-log-toggle.open { border-radius: 8px 8px 0 0; border-bottom-color: transparent; }
+
+        .game-log-body {
+            display: none;
+            background: #111A33;
+            border: 1px solid #1A2844;
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            padding: 16px;
+        }
+
+        .game-log-body.open { display: block; }
+
+        .game-log-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .game-log-controls select {
+            padding: 8px 12px;
+            border: 2px solid #1A2844;
+            border-radius: 6px;
+            background: #0B1026;
+            color: #fff;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .game-log-controls select:focus { border-color: #F5C842; }
+
+        .game-log-controls .btn-fetch-log {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 6px;
+            background: #F5C842;
+            color: #0B1026;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .game-log-controls .btn-fetch-log:hover:not(:disabled) { background: #F7D35A; }
+        .game-log-controls .btn-fetch-log:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .game-log-scroll {
+            max-height: 420px;
+            overflow-y: auto;
+            border-radius: 6px;
+        }
+
+        .game-log-scroll::-webkit-scrollbar { width: 8px; }
+        .game-log-scroll::-webkit-scrollbar-track { background: #0B1026; }
+        .game-log-scroll::-webkit-scrollbar-thumb { background: #2A3855; border-radius: 4px; }
+
+        .game-log-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .game-log-table th {
+            background: #1A2844;
+            color: #7888AA;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 10px;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            white-space: nowrap;
+        }
+
+        .game-log-table td {
+            padding: 7px 10px;
+            border-top: 1px solid #1A2844;
+            text-align: center;
+            color: #ccc;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        .game-log-table tr:hover { background: #152038; }
+
+        .game-log-table .col-date { text-align: left; color: #7888AA; }
+        .game-log-table .col-opp { text-align: left; color: #5EC4E6; font-weight: 600; }
+        .game-log-table .col-highlight { color: #F5C842; font-weight: 600; }
+
+        .game-log-empty {
+            color: #7888AA;
+            text-align: center;
+            padding: 24px;
+            font-size: 13px;
+        }
+
         /* Page layout: two-column with sticky sidebar */
         .page-layout {
             display: flex;
@@ -797,6 +940,29 @@
                     </thead>
                     <tbody id="videoTableBody"></tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Log (fold-out) -->
+    <div class="game-log-section" id="gameLogSection">
+        <div class="game-log-toggle" id="gameLogToggle" onclick="toggleGameLog()">
+            <div class="toggle-left">
+                <span>Game Log</span>
+            </div>
+            <span class="toggle-arrow">&#9660;</span>
+        </div>
+        <div class="game-log-body" id="gameLogBody">
+            <div class="game-log-controls">
+                <select id="gameLogSeason"></select>
+                <select id="gameLogGroup">
+                    <option value="hitting">Batting</option>
+                    <option value="pitching">Pitching</option>
+                </select>
+                <button class="btn-fetch-log" id="fetchLogBtn" onclick="fetchGameLog()">Load Game Log</button>
+            </div>
+            <div class="game-log-scroll">
+                <div id="gameLogContent" class="game-log-empty">Select a season and click "Load Game Log"</div>
             </div>
         </div>
     </div>
@@ -1353,6 +1519,9 @@ function renderPlayerDetail(index) {
     populateSeasonCheckboxes();
     document.getElementById('savantUrlBuilder').style.display = 'block';
     updateSavantUrls();
+
+    // Show game log section and populate its season dropdown
+    showGameLogSection(player);
 }
 
 function populateSeasonCheckboxes() {
@@ -1423,6 +1592,145 @@ function useUrl(btn) {
     searchInput.focus();
     setTimeout(() => { searchInput.style.borderColor = ''; }, 2000);
     showStatus('URL loaded into search bar. Click "Search" to find videos.', 'info');
+}
+
+// --- Game Log ---
+let gameLogPlayerId = null;
+
+function showGameLogSection(player) {
+    gameLogPlayerId = player.mlb_id;
+    const section = document.getElementById('gameLogSection');
+    section.classList.add('show');
+
+    // Populate season dropdown
+    const sel = document.getElementById('gameLogSeason');
+    const currentYear = new Date().getFullYear();
+    let html = '';
+    for (let y = currentYear; y >= SEASON_START; y--) {
+        html += '<option value="' + y + '">' + y + '</option>';
+    }
+    sel.innerHTML = html;
+
+    // Auto-select group based on position
+    const groupSel = document.getElementById('gameLogGroup');
+    if (player.position === 'P') {
+        groupSel.value = 'pitching';
+    } else {
+        groupSel.value = 'hitting';
+    }
+
+    // Reset body
+    document.getElementById('gameLogContent').innerHTML = '<div class="game-log-empty">Select a season and click "Load Game Log"</div>';
+
+    // Collapse by default
+    document.getElementById('gameLogToggle').classList.remove('open');
+    document.getElementById('gameLogBody').classList.remove('open');
+}
+
+function toggleGameLog() {
+    const toggle = document.getElementById('gameLogToggle');
+    const body = document.getElementById('gameLogBody');
+    toggle.classList.toggle('open');
+    body.classList.toggle('open');
+}
+
+function fetchGameLog() {
+    if (!gameLogPlayerId) return;
+    const season = document.getElementById('gameLogSeason').value;
+    const group = document.getElementById('gameLogGroup').value;
+    const btn = document.getElementById('fetchLogBtn');
+    const content = document.getElementById('gameLogContent');
+
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+    content.innerHTML = '<div class="game-log-empty"><span class="spinner"></span> Fetching game log...</div>';
+
+    fetch('/api/game-log', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({mlb_id: gameLogPlayerId, season: season, group: group}),
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Load Game Log';
+
+        if (data.error) {
+            content.innerHTML = '<div class="game-log-empty">' + esc(data.error) + '</div>';
+            return;
+        }
+        if (!data.games || data.games.length === 0) {
+            content.innerHTML = '<div class="game-log-empty">No games found for this season.</div>';
+            return;
+        }
+
+        content.innerHTML = renderGameLogTable(data.games, data.group);
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.textContent = 'Load Game Log';
+        content.innerHTML = '<div class="game-log-empty">Error loading game log.</div>';
+    });
+}
+
+function renderGameLogTable(games, group) {
+    let html = '<table class="game-log-table"><thead><tr>';
+
+    if (group === 'hitting') {
+        html += '<th class="col-date">Date</th><th>Opp</th>'
+            + '<th>AB</th><th>R</th><th>H</th><th>2B</th><th>3B</th><th>HR</th>'
+            + '<th>RBI</th><th>BB</th><th>SO</th><th>SB</th><th>AVG</th><th>OPS</th>';
+    } else {
+        html += '<th class="col-date">Date</th><th>Opp</th><th>Dec</th>'
+            + '<th>IP</th><th>H</th><th>R</th><th>ER</th><th>BB</th><th>SO</th>'
+            + '<th>HR</th><th>P</th><th>S</th><th>ERA</th>';
+    }
+
+    html += '</tr></thead><tbody>';
+
+    for (const g of games) {
+        const prefix = g.home ? 'vs ' : '@ ';
+        const oppShort = g.opponent.replace(/^(.*?)( of .*)?$/, '$1');
+
+        if (group === 'hitting') {
+            const hrClass = g.hr > 0 ? ' class="col-highlight"' : '';
+            html += '<tr>'
+                + '<td class="col-date">' + esc(g.date) + '</td>'
+                + '<td class="col-opp">' + esc(prefix + oppShort) + '</td>'
+                + '<td>' + g.ab + '</td>'
+                + '<td>' + g.r + '</td>'
+                + '<td>' + g.h + '</td>'
+                + '<td>' + g.doubles + '</td>'
+                + '<td>' + g.triples + '</td>'
+                + '<td' + hrClass + '>' + g.hr + '</td>'
+                + '<td>' + g.rbi + '</td>'
+                + '<td>' + g.bb + '</td>'
+                + '<td>' + g.so + '</td>'
+                + '<td>' + g.sb + '</td>'
+                + '<td>' + esc(g.avg) + '</td>'
+                + '<td>' + esc(g.ops) + '</td>'
+                + '</tr>';
+        } else {
+            html += '<tr>'
+                + '<td class="col-date">' + esc(g.date) + '</td>'
+                + '<td class="col-opp">' + esc(prefix + oppShort) + '</td>'
+                + '<td>' + esc(g.decision) + '</td>'
+                + '<td>' + esc(g.ip) + '</td>'
+                + '<td>' + g.h + '</td>'
+                + '<td>' + g.r + '</td>'
+                + '<td>' + g.er + '</td>'
+                + '<td>' + g.bb + '</td>'
+                + '<td>' + g.so + '</td>'
+                + '<td>' + g.hr + '</td>'
+                + '<td>' + g.pitches + '</td>'
+                + '<td>' + g.strikes + '</td>'
+                + '<td>' + esc(g.era) + '</td>'
+                + '</tr>';
+        }
+    }
+
+    html += '</tbody></table>';
+    return html;
 }
 </script>
 

@@ -629,6 +629,86 @@ def api_download_file(job_id):
     )
 
 
+@app.route("/api/game-log", methods=["POST"])
+def api_game_log():
+    """Fetch a player's game log from the MLB Stats API."""
+    data = request.get_json()
+    mlb_id = data.get("mlb_id")
+    season = data.get("season")
+    group = data.get("group", "hitting")  # "hitting" or "pitching"
+
+    if not mlb_id or not season:
+        return jsonify({"error": "mlb_id and season are required"}), 400
+
+    if group not in ("hitting", "pitching"):
+        return jsonify({"error": "group must be 'hitting' or 'pitching'"}), 400
+
+    session = create_session()
+    api_url = (
+        f"https://statsapi.mlb.com/api/v1/people/{mlb_id}/stats"
+        f"?stats=gameLog&season={season}&group={group}"
+    )
+
+    try:
+        resp = session.get(api_url, timeout=15)
+        resp.raise_for_status()
+        api_data = resp.json()
+    except Exception as e:
+        return jsonify({"error": f"MLB API error: {e}"}), 500
+
+    stats_list = api_data.get("stats", [])
+    if not stats_list:
+        return jsonify({"games": []})
+
+    splits = stats_list[0].get("splits", [])
+    games = []
+    for split in splits:
+        stat = split.get("stat", {})
+        opponent = split.get("opponent", {}).get("name", "")
+        game_date = split.get("date", "")
+        is_home = split.get("isHome", False)
+
+        game = {
+            "date": game_date,
+            "opponent": opponent,
+            "home": is_home,
+        }
+
+        if group == "hitting":
+            game.update({
+                "ab": stat.get("atBats", 0),
+                "r": stat.get("runs", 0),
+                "h": stat.get("hits", 0),
+                "doubles": stat.get("doubles", 0),
+                "triples": stat.get("triples", 0),
+                "hr": stat.get("homeRuns", 0),
+                "rbi": stat.get("rbi", 0),
+                "bb": stat.get("baseOnBalls", 0),
+                "so": stat.get("strikeOuts", 0),
+                "sb": stat.get("stolenBases", 0),
+                "avg": stat.get("avg", ""),
+                "ops": stat.get("ops", ""),
+            })
+        else:
+            game.update({
+                "ip": stat.get("inningsPitched", ""),
+                "h": stat.get("hits", 0),
+                "r": stat.get("runs", 0),
+                "er": stat.get("earnedRuns", 0),
+                "bb": stat.get("baseOnBalls", 0),
+                "so": stat.get("strikeOuts", 0),
+                "hr": stat.get("homeRuns", 0),
+                "era": stat.get("era", ""),
+                "pitches": stat.get("numberOfPitches", 0),
+                "strikes": stat.get("strikes", 0),
+                "decision": stat.get("note", ""),
+            })
+
+        games.append(game)
+
+    return jsonify({"games": games, "group": group})
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(debug=True, host="0.0.0.0", port=port)
