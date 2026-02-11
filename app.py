@@ -153,55 +153,81 @@ def probe_has_audio(path):
     return bool(result.stdout.strip())
 
 
-def combine_videos(file_paths, output_path):
-    """Combine multiple mp4 files into one using ffmpeg concat filter.
+def normalize_clip(input_path, output_path):
+    """Normalize a single clip to 1280x720, 30fps, with audio (silent if none).
 
-    Re-encodes to handle clips with different resolutions/codecs/framerates.
-    Generates silent audio for clips that have no audio track.
+    This ensures all clips have identical format so concat demuxer works.
+    """
+    has_audio = probe_has_audio(input_path)
+
+    cmd = ["ffmpeg", "-y", "-i", input_path]
+
+    if not has_audio:
+        # Add a silent audio source; -shortest stops when video ends
+        cmd.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"])
+
+    cmd.extend([
+        "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
+               "pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-ar", "48000", "-ac", "2", "-c:a", "aac", "-b:a", "128k",
+    ])
+
+    if not has_audio:
+        cmd.append("-shortest")
+
+    cmd.extend(["-movflags", "+faststart", output_path])
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"ffmpeg normalize failed for {os.path.basename(input_path)}: "
+            f"{result.stderr[-300:]}"
+        )
+
+
+def combine_videos(file_paths, output_path):
+    """Combine multiple mp4 files using a two-step approach.
+
+    Step 1: Normalize each clip to identical format (resolution, fps, audio).
+    Step 2: Use ffmpeg concat demuxer to join them (fast, since formats match).
     """
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg is not installed on this server.")
 
-    # Build the concat filter: scale all to 1280x720, 30fps, then concatenate
-    inputs = []
-    filter_parts = []
+    work_dir = os.path.dirname(output_path)
+    normalized = []
+
+    # Step 1: Normalize each clip
     for i, path in enumerate(file_paths):
-        inputs.extend(["-i", path])
-        has_audio = probe_has_audio(path)
+        norm_path = os.path.join(work_dir, f"_norm_{i}.mp4")
+        normalize_clip(path, norm_path)
+        normalized.append(norm_path)
 
-        filter_parts.append(
-            f"[{i}:v]scale=1280:720:force_original_aspect_ratio=decrease,"
-            f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v{i}];"
-        )
-        if has_audio:
-            filter_parts.append(f"[{i}:a]aresample=48000[a{i}];")
-        else:
-            # Generate silent audio matching the video duration
-            filter_parts.append(
-                f"anullsrc=r=48000:cl=stereo[a{i}_null];"
-                f"[a{i}_null]atrim=duration=30[a{i}];"
-            )
+    # Step 2: Write concat list and join
+    list_path = os.path.join(work_dir, "_concat_list.txt")
+    try:
+        with open(list_path, "w") as f:
+            for norm in normalized:
+                f.write(f"file '{norm}'\n")
 
-    v_streams = "".join(f"[v{i}]" for i in range(len(file_paths)))
-    a_streams = "".join(f"[a{i}]" for i in range(len(file_paths)))
-    n = len(file_paths)
-    filter_parts.append(f"{v_streams}{a_streams}concat=n={n}:v=1:a=1[outv][outa]")
-
-    filter_complex = "".join(filter_parts)
-
-    cmd = [
-        "ffmpeg", "-y",
-        *inputs,
-        "-filter_complex", filter_complex,
-        "-map", "[outv]", "-map", "[outa]",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-c:a", "aac", "-b:a", "128k",
-        "-movflags", "+faststart",
-        output_path,
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-    if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg failed: {result.stderr[:500]}")
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat", "-safe", "0", "-i", list_path,
+            "-c", "copy",
+            "-movflags", "+faststart",
+            output_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg concat failed: {result.stderr[-300:]}")
+    finally:
+        # Clean up temp files
+        for norm in normalized:
+            if os.path.exists(norm):
+                os.remove(norm)
+        if os.path.exists(list_path):
+            os.remove(list_path)
 
 
 def get_job_dir(job_id):
