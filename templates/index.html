@@ -1013,7 +1013,7 @@ function renderPlayerDetail(index) {
 
     // Season checkboxes
     html += '<div style="margin-top: 16px; display: flex; gap: 16px; align-items: center;">';
-    html += '<label class="combine-option"><input type="checkbox" id="seasonCurrent" checked onchange="updateSavantUrls()">';
+    html += '<label class="combine-option"><input type="checkbox" id="seasonCurrent" onchange="updateSavantUrls()">';
     html += '<span>' + currentYear + ' (Current Season)</span></label>';
     html += '<label class="combine-option"><input type="checkbox" id="seasonLast" onchange="updateSavantUrls()">';
     html += '<span>' + lastYear + ' (Last Season)</span></label>';
@@ -1032,8 +1032,17 @@ function updateSavantUrls() {
     const player = playerSearchResults[selectedPlayerIndex];
     if (!player) return;
 
+    const tbody = document.getElementById('hitTypeBody');
+    if (!tbody) return;
+
     const currentChecked = document.getElementById('seasonCurrent')?.checked;
     const lastChecked = document.getElementById('seasonLast')?.checked;
+
+    if (!currentChecked && !lastChecked) {
+        tbody.innerHTML = '';
+        return;
+    }
+
     const currentYear = new Date().getFullYear();
     const lastYear = currentYear - 1;
 
@@ -1042,10 +1051,8 @@ function updateSavantUrls() {
         seasonKey = lastYear + '-' + currentYear;
     } else if (currentChecked) {
         seasonKey = '' + currentYear;
-    } else if (lastChecked) {
-        seasonKey = '' + lastYear;
     } else {
-        seasonKey = '' + currentYear;
+        seasonKey = '' + lastYear;
     }
 
     const hitTypes = [
@@ -1054,9 +1061,6 @@ function updateSavantUrls() {
         {label: 'Triples', key: 'Triples'},
         {label: 'Home Runs', key: 'Home Runs'},
     ];
-
-    const tbody = document.getElementById('hitTypeBody');
-    if (!tbody) return;
 
     let html = '';
     for (const ht of hitTypes) {
