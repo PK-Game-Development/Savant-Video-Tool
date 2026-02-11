@@ -141,30 +141,45 @@ def try_download(game_pk, play_id, broadcast, output_path, session):
 
 
 def combine_videos(file_paths, output_path):
-    """Combine multiple mp4 files into one using ffmpeg concat demuxer."""
+    """Combine multiple mp4 files into one using ffmpeg concat filter.
+
+    Re-encodes to handle clips with different resolutions/codecs/framerates,
+    which is common when mixing videos from different games or broadcasts.
+    """
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg is not installed on this server.")
 
-    tmp_fd, tmp_list = tempfile.mkstemp(suffix=".txt")
-    try:
-        with os.fdopen(tmp_fd, "w") as f:
-            for path in file_paths:
-                escaped = path.replace("'", "'\\''")
-                f.write(f"file '{escaped}'\n")
+    # Build the concat filter: scale all to 1280x720, 30fps, then concatenate
+    inputs = []
+    filter_parts = []
+    for i, path in enumerate(file_paths):
+        inputs.extend(["-i", path])
+        filter_parts.append(
+            f"[{i}:v]scale=1280:720:force_original_aspect_ratio=decrease,"
+            f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v{i}];"
+        )
+        filter_parts.append(f"[{i}:a]aresample=48000[a{i}];")
 
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", tmp_list,
-            "-c", "copy",
-            output_path,
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if result.returncode != 0:
-            raise RuntimeError(f"ffmpeg failed: {result.stderr[:500]}")
-    finally:
-        os.unlink(tmp_list)
+    v_streams = "".join(f"[v{i}]" for i in range(len(file_paths)))
+    a_streams = "".join(f"[a{i}]" for i in range(len(file_paths)))
+    n = len(file_paths)
+    filter_parts.append(f"{v_streams}{a_streams}concat=n={n}:v=1:a=1[outv][outa]")
+
+    filter_complex = "".join(filter_parts)
+
+    cmd = [
+        "ffmpeg", "-y",
+        *inputs,
+        "-filter_complex", filter_complex,
+        "-map", "[outv]", "-map", "[outa]",
+        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed: {result.stderr[:500]}")
 
 
 def get_job_dir(job_id):
