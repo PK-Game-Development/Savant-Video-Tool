@@ -322,11 +322,6 @@ def main():
         if events:
             label += f" - {events}"
 
-        if os.path.exists(output_path):
-            print(f"[{i}/{len(resolved)}] Skip (exists): {filename}")
-            skipped += 1
-            continue
-
         print(f"[{i}/{len(resolved)}] {label}")
 
         success = try_download_video(

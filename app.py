@@ -189,7 +189,6 @@ def api_search():
             continue
 
         filename = build_filename(row)
-        already_downloaded = os.path.exists(os.path.join(DOWNLOAD_DIR, filename))
 
         videos.append({
             "player": row.get("player_name", "Unknown"),
@@ -203,7 +202,6 @@ def api_search():
             "game_pk": game_pk,
             "play_id": play_id,
             "filename": filename,
-            "downloaded": already_downloaded,
             "savant_url": SPORTY_VIDEO_URL.format(play_id=play_id),
         })
 
@@ -247,11 +245,6 @@ def api_download():
             output_path = os.path.join(DOWNLOAD_DIR, filename)
 
             job["current"] = f"{video.get('player', '')} - {video.get('date', '')}"
-
-            if os.path.exists(output_path):
-                job["completed"] += 1
-                job["results"].append({"filename": filename, "status": "skipped"})
-                continue
 
             success = try_download(game_pk, play_id, broadcast, output_path, session)
 
