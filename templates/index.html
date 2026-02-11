@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Baseball Savant Video Downloader</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1923;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a2a3a, #0d2137);
+            border-bottom: 3px solid #c41e3a;
+            padding: 20px 0;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            color: #fff;
+            letter-spacing: 1px;
+        }
+
+        .header h1 span { color: #c41e3a; }
+
+        .header p {
+            color: #8899aa;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px 16px;
+        }
+
+        /* Search Section */
+        .search-section {
+            background: #1a2a3a;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .search-row input[type="text"] {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #2a3a4a;
+            border-radius: 6px;
+            background: #0f1923;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-row input[type="text"]:focus {
+            border-color: #c41e3a;
+        }
+
+        .search-row input[type="text"]::placeholder {
+            color: #556677;
+        }
+
+        .options-row {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .option-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .option-group label {
+            font-size: 13px;
+            color: #8899aa;
+        }
+
+        .option-group select,
+        .option-group input[type="number"] {
+            padding: 8px 12px;
+            border: 2px solid #2a3a4a;
+            border-radius: 6px;
+            background: #0f1923;
+            color: #fff;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .option-group input[type="number"] { width: 80px; }
+
+        .btn {
+            padding: 12px 28px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-search {
+            background: #c41e3a;
+            color: #fff;
+        }
+
+        .btn-search:hover:not(:disabled) { background: #d4324c; }
+
+        .btn-download {
+            background: #1a7a3a;
+            color: #fff;
+        }
+
+        .btn-download:hover:not(:disabled) { background: #22944a; }
+
+        .btn-select {
+            background: #2a3a4a;
+            color: #ccc;
+            padding: 8px 16px;
+            font-size: 13px;
+        }
+
+        .btn-select:hover:not(:disabled) { background: #3a4a5a; }
+
+        /* Status Messages */
+        .status {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status.show { display: block; }
+        .status.info { background: #1a3050; border: 1px solid #2a5080; color: #7ab8ee; }
+        .status.error { background: #3a1a1a; border: 1px solid #802a2a; color: #ee7a7a; }
+        .status.success { background: #1a3a1a; border: 1px solid #2a802a; color: #7aee7a; }
+
+        /* Results Section */
+        .results-section {
+            display: none;
+        }
+
+        .results-section.show { display: block; }
+
+        .results-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .results-header h2 {
+            font-size: 18px;
+            color: #fff;
+        }
+
+        .results-header .stats {
+            color: #8899aa;
+            font-size: 13px;
+        }
+
+        .results-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        /* Video Table */
+        .video-table-wrap {
+            background: #1a2a3a;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .video-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .video-table th {
+            background: #223344;
+            color: #8899aa;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 12px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+        }
+
+        .video-table td {
+            padding: 10px 12px;
+            font-size: 13px;
+            border-top: 1px solid #223344;
+        }
+
+        .video-table tr:hover { background: #1e3040; }
+
+        .video-table .player { font-weight: 600; color: #fff; }
+        .video-table .event { color: #7ab8ee; }
+        .video-table .date { color: #8899aa; }
+        .video-table .stat { color: #aaa; font-variant-numeric: tabular-nums; }
+
+        .video-table .status-cell {
+            width: 90px;
+            text-align: center;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-ready { background: #2a3a4a; color: #8899aa; }
+        .badge-downloading { background: #1a3050; color: #7ab8ee; }
+        .badge-done { background: #1a3a1a; color: #7aee7a; }
+        .badge-failed { background: #3a1a1a; color: #ee7a7a; }
+        .badge-skipped { background: #3a3a1a; color: #eecc7a; }
+        .badge-exists { background: #1a3a1a; color: #7aee7a; }
+
+        .checkbox-cell { width: 40px; text-align: center; }
+
+        input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            accent-color: #c41e3a;
+            cursor: pointer;
+        }
+
+        /* Progress Section */
+        .progress-section {
+            background: #1a2a3a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .progress-section.show { display: block; }
+
+        .progress-bar-wrap {
+            background: #0f1923;
+            border-radius: 4px;
+            height: 24px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #c41e3a, #d4324c);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: #8899aa;
+        }
+
+        .progress-current {
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        /* Preview Link */
+        a.preview-link {
+            color: #7ab8ee;
+            text-decoration: none;
+            font-size: 12px;
+        }
+
+        a.preview-link:hover { text-decoration: underline; }
+
+        /* Scrollable table */
+        .table-scroll {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .table-scroll::-webkit-scrollbar { width: 8px; }
+        .table-scroll::-webkit-scrollbar-track { background: #1a2a3a; }
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: #3a4a5a;
+            border-radius: 4px;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #556677;
+            border-top-color: #c41e3a;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1><span>Baseball Savant</span> Video Downloader</h1>
+    <p>Paste a Statcast search URL to find and download video clips</p>
+</div>
+
+<div class="container">
+
+    <!-- Search -->
+    <div class="search-section">
+        <div class="search-row">
+            <input type="text" id="searchUrl"
+                   placeholder="Paste your Baseball Savant search URL here..."
+                   spellcheck="false">
+            <button class="btn btn-search" id="searchBtn" onclick="doSearch()">Search</button>
+        </div>
+        <div class="options-row">
+            <div class="option-group">
+                <label for="broadcast">Broadcast:</label>
+                <select id="broadcast">
+                    <option value="home">Home</option>
+                    <option value="away">Away</option>
+                </select>
+            </div>
+            <div class="option-group">
+                <label for="maxResults">Max videos:</label>
+                <input type="number" id="maxResults" value="0" min="0" placeholder="0 = all">
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Message -->
+    <div class="status" id="statusMsg"></div>
+
+    <!-- Progress -->
+    <div class="progress-section" id="progressSection">
+        <div class="progress-current" id="progressCurrent">Downloading...</div>
+        <div class="progress-bar-wrap">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+        <div class="progress-info">
+            <span id="progressCount">0 / 0</span>
+            <span id="progressPct">0%</span>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-section" id="resultsSection">
+        <div class="results-header">
+            <div>
+                <h2>Videos Found</h2>
+                <span class="stats" id="resultsStats"></span>
+            </div>
+            <div class="results-actions">
+                <button class="btn btn-select" onclick="selectAll()">Select All</button>
+                <button class="btn btn-select" onclick="selectNone()">Select None</button>
+                <button class="btn btn-download" id="downloadBtn" onclick="doDownload()">
+                    Download Selected
+                </button>
+            </div>
+        </div>
+        <div class="video-table-wrap">
+            <div class="table-scroll">
+                <table class="video-table">
+                    <thead>
+                        <tr>
+                            <th class="checkbox-cell"><input type="checkbox" id="checkAll" onchange="toggleAll(this)"></th>
+                            <th>Player</th>
+                            <th>Date</th>
+                            <th>Result</th>
+                            <th>Pitch</th>
+                            <th>Velo</th>
+                            <th>EV</th>
+                            <th>LA</th>
+                            <th>Preview</th>
+                            <th class="status-cell">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="videoTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+let videoData = [];
+
+function showStatus(msg, type) {
+    const el = document.getElementById('statusMsg');
+    el.textContent = msg;
+    el.className = 'status show ' + type;
+}
+
+function hideStatus() {
+    document.getElementById('statusMsg').className = 'status';
+}
+
+async function doSearch() {
+    const url = document.getElementById('searchUrl').value.trim();
+    if (!url) {
+        showStatus('Please paste a Baseball Savant search URL.', 'error');
+        return;
+    }
+
+    const maxResults = parseInt(document.getElementById('maxResults').value) || 0;
+    const btn = document.getElementById('searchBtn');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Searching...';
+    hideStatus();
+    document.getElementById('resultsSection').classList.remove('show');
+
+    try {
+        const resp = await fetch('/api/search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url: url, max: maxResults}),
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            showStatus(data.error || 'Search failed.', 'error');
+            return;
+        }
+
+        videoData = data.videos;
+        renderTable(videoData);
+
+        document.getElementById('resultsStats').textContent =
+            `${data.total_pitches} total pitches found | ${data.videos_resolved} videos resolved | ${data.games} games`;
+        document.getElementById('resultsSection').classList.add('show');
+
+        if (videoData.length === 0) {
+            showStatus('No videos could be resolved from the search results.', 'error');
+        } else {
+            showStatus(`Found ${videoData.length} downloadable videos.`, 'success');
+        }
+
+    } catch (err) {
+        showStatus('Network error: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Search';
+    }
+}
+
+function renderTable(videos) {
+    const tbody = document.getElementById('videoTableBody');
+    tbody.innerHTML = '';
+
+    videos.forEach((v, i) => {
+        const tr = document.createElement('tr');
+        tr.id = 'row-' + i;
+
+        let statusBadge;
+        if (v.downloaded) {
+            statusBadge = '<span class="badge badge-exists">Downloaded</span>';
+        } else {
+            statusBadge = '<span class="badge badge-ready">Ready</span>';
+        }
+
+        tr.innerHTML = `
+            <td class="checkbox-cell">
+                <input type="checkbox" class="vid-check" data-index="${i}" ${v.downloaded ? '' : 'checked'}>
+            </td>
+            <td class="player">${esc(v.player)}</td>
+            <td class="date">${esc(v.date)}</td>
+            <td class="event">${esc(v.event || '-')}</td>
+            <td class="stat">${esc(v.pitch_type || '-')}</td>
+            <td class="stat">${v.release_speed ? esc(v.release_speed) + ' mph' : '-'}</td>
+            <td class="stat">${v.launch_speed ? esc(v.launch_speed) + ' mph' : '-'}</td>
+            <td class="stat">${v.launch_angle ? esc(v.launch_angle) + '°' : '-'}</td>
+            <td><a class="preview-link" href="${esc(v.savant_url)}" target="_blank">View</a></td>
+            <td class="status-cell" id="status-${i}">${statusBadge}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function esc(str) {
+    const d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+}
+
+function selectAll() {
+    document.querySelectorAll('.vid-check').forEach(cb => cb.checked = true);
+    document.getElementById('checkAll').checked = true;
+}
+
+function selectNone() {
+    document.querySelectorAll('.vid-check').forEach(cb => cb.checked = false);
+    document.getElementById('checkAll').checked = false;
+}
+
+function toggleAll(master) {
+    document.querySelectorAll('.vid-check').forEach(cb => cb.checked = master.checked);
+}
+
+async function doDownload() {
+    const selected = [];
+    document.querySelectorAll('.vid-check:checked').forEach(cb => {
+        const idx = parseInt(cb.dataset.index);
+        selected.push(videoData[idx]);
+    });
+
+    if (selected.length === 0) {
+        showStatus('No videos selected.', 'error');
+        return;
+    }
+
+    const broadcast = document.getElementById('broadcast').value;
+    const btn = document.getElementById('downloadBtn');
+    btn.disabled = true;
+
+    hideStatus();
+
+    // Mark selected rows as queued
+    document.querySelectorAll('.vid-check:checked').forEach(cb => {
+        const idx = cb.dataset.index;
+        document.getElementById('status-' + idx).innerHTML =
+            '<span class="badge badge-ready">Queued</span>';
+    });
+
+    // Start download job
+    try {
+        const resp = await fetch('/api/download', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({videos: selected, broadcast: broadcast}),
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            showStatus(data.error || 'Download failed to start.', 'error');
+            btn.disabled = false;
+            return;
+        }
+
+        // Show progress and track via SSE
+        trackProgress(data.job_id, selected);
+
+    } catch (err) {
+        showStatus('Network error: ' + err.message, 'error');
+        btn.disabled = false;
+    }
+}
+
+function trackProgress(jobId, selected) {
+    const progSection = document.getElementById('progressSection');
+    const progBar = document.getElementById('progressBar');
+    const progCount = document.getElementById('progressCount');
+    const progPct = document.getElementById('progressPct');
+    const progCurrent = document.getElementById('progressCurrent');
+
+    progSection.classList.add('show');
+
+    const evtSource = new EventSource('/api/progress/' + jobId);
+
+    evtSource.onmessage = function(e) {
+        const job = JSON.parse(e.data);
+
+        if (job.error) {
+            evtSource.close();
+            showStatus(job.error, 'error');
+            return;
+        }
+
+        const done = job.completed + job.failed;
+        const total = job.total;
+        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+        progBar.style.width = pct + '%';
+        progCount.textContent = `${done} / ${total}`;
+        progPct.textContent = pct + '%';
+
+        if (job.current) {
+            progCurrent.innerHTML = '<span class="spinner"></span>Downloading: ' + esc(job.current);
+        }
+
+        // Update row statuses from results
+        job.results.forEach((r, i) => {
+            // Find the matching video in the table
+            const filename = r.filename;
+            const vidIdx = videoData.findIndex(v => v.filename === filename);
+            if (vidIdx === -1) return;
+
+            const cell = document.getElementById('status-' + vidIdx);
+            if (!cell) return;
+
+            if (r.status === 'ok') {
+                cell.innerHTML = '<span class="badge badge-done">Done</span>';
+            } else if (r.status === 'failed') {
+                cell.innerHTML = '<span class="badge badge-failed">Failed</span>';
+            } else if (r.status === 'skipped') {
+                cell.innerHTML = '<span class="badge badge-skipped">Skipped</span>';
+            }
+        });
+
+        if (job.status === 'done') {
+            evtSource.close();
+            progCurrent.textContent = 'Complete!';
+            document.getElementById('downloadBtn').disabled = false;
+
+            const msg = `Download complete: ${job.completed} downloaded, ${job.failed} failed.`;
+            showStatus(msg, job.failed > 0 ? 'info' : 'success');
+        }
+    };
+
+    evtSource.onerror = function() {
+        evtSource.close();
+        document.getElementById('downloadBtn').disabled = false;
+        // Try polling as fallback
+        pollProgress(jobId);
+    };
+}
+
+async function pollProgress(jobId) {
+    try {
+        const resp = await fetch('/api/status/' + jobId);
+        const job = await resp.json();
+        if (job.status === 'done') {
+            showStatus(`Download complete: ${job.completed} downloaded, ${job.failed} failed.`, 'success');
+        } else {
+            setTimeout(() => pollProgress(jobId), 1000);
+        }
+    } catch (e) {
+        // stop polling
+    }
+}
+
+// Allow Enter key to trigger search
+document.getElementById('searchUrl').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doSearch();
+});
+</script>
+
+</body>
+</html>
