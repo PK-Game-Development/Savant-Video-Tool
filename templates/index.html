@@ -1129,25 +1129,48 @@ let videoData = [];
 let currentPlayerType = 'batter';
 let currentJobId = null;
 
-const PA_RESULTS = [
+const BATTING_PA = [
     {label: 'Single', event: 'single'},
     {label: 'Double', event: 'double'},
     {label: 'Triple', event: 'triple'},
     {label: 'Home Run', event: 'home_run'},
     {label: 'Walk', event: 'walk'},
-    {label: 'Intent Walk', event: 'intent_walk'},
-    {label: 'Hit By Pitch', event: 'hit_by_pitch'},
+    {label: 'IBB', event: 'intent_walk'},
+    {label: 'HBP', event: 'hit_by_pitch'},
     {label: 'Sac Fly', event: 'sac_fly'},
     {label: 'Sac Bunt', event: 'sac_bunt'},
     {label: 'Strikeout', event: 'strikeout'},
-    {label: 'Strikeout DP', event: 'strikeout_double_play'},
+    {label: 'K DP', event: 'strikeout_double_play'},
     {label: 'Field Out', event: 'field_out'},
     {label: 'Force Out', event: 'force_out'},
-    {label: 'Grounded Into DP', event: 'grounded_into_double_play'},
+    {label: 'GIDP', event: 'grounded_into_double_play'},
     {label: 'Double Play', event: 'double_play'},
     {label: "Fielder's Choice", event: 'fielders_choice'},
-    {label: "FC Out", event: 'fielders_choice_out'},
-    {label: 'Field Error', event: 'field_error'},
+    {label: 'FC Out', event: 'fielders_choice_out'},
+    {label: 'Error', event: 'field_error'},
+    {label: 'Catcher Interf', event: 'catcher_interf'},
+    {label: 'Sac Fly DP', event: 'sac_fly_double_play'},
+    {label: 'Triple Play', event: 'triple_play'},
+];
+const PITCHING_PA = [
+    {label: 'Strikeout', event: 'strikeout'},
+    {label: 'K DP', event: 'strikeout_double_play'},
+    {label: 'Field Out', event: 'field_out'},
+    {label: 'Force Out', event: 'force_out'},
+    {label: 'GIDP', event: 'grounded_into_double_play'},
+    {label: 'Double Play', event: 'double_play'},
+    {label: 'Sac Fly', event: 'sac_fly'},
+    {label: 'Sac Bunt', event: 'sac_bunt'},
+    {label: 'Single', event: 'single'},
+    {label: 'Double', event: 'double'},
+    {label: 'Triple', event: 'triple'},
+    {label: 'Home Run', event: 'home_run'},
+    {label: 'Walk', event: 'walk'},
+    {label: 'IBB', event: 'intent_walk'},
+    {label: 'HBP', event: 'hit_by_pitch'},
+    {label: "Fielder's Choice", event: 'fielders_choice'},
+    {label: 'FC Out', event: 'fielders_choice_out'},
+    {label: 'Error', event: 'field_error'},
     {label: 'Catcher Interf', event: 'catcher_interf'},
     {label: 'Sac Fly DP', event: 'sac_fly_double_play'},
     {label: 'Triple Play', event: 'triple_play'},
@@ -1171,10 +1194,12 @@ function populatePaCheckboxes() {
     const pitchingContainer = document.getElementById('pitchingPaCheckboxes');
     let bHtml = '';
     let pHtml = '';
-    PA_RESULTS.forEach((pa, i) => {
+    BATTING_PA.forEach((pa, i) => {
         bHtml += '<label class="combine-option compact">'
             + '<input type="checkbox" class="batting-pa-cb" value="' + i + '" onchange="updateBuiltUrl()">'
             + '<span>' + pa.label + '</span></label>';
+    });
+    PITCHING_PA.forEach((pa, i) => {
         pHtml += '<label class="combine-option compact">'
             + '<input type="checkbox" class="pitching-pa-cb" value="' + i + '" onchange="updateBuiltUrl()">'
             + '<span>' + pa.label + '</span></label>';
@@ -1830,7 +1855,7 @@ function updateBuiltUrl() {
         const checkedPa = [...document.querySelectorAll('.batting-pa-cb:checked')];
         if (checkedPa.length === 0) { searchInput.value = ''; return; }
 
-        const events = checkedPa.map(cb => PA_RESULTS[parseInt(cb.value)].event);
+        const events = checkedPa.map(cb => BATTING_PA[parseInt(cb.value)].event);
         const eventsStr = events.map(e => e + '%7C').join('');
         searchInput.value = base + '?hfAB=' + eventsStr
             + '&hfSea=' + seasonsStr
@@ -1847,7 +1872,7 @@ function updateBuiltUrl() {
             + '&hfGT=' + gtStr + '&hfSea=' + seasonsStr;
 
         if (checkedPa.length > 0) {
-            const events = checkedPa.map(cb => PA_RESULTS[parseInt(cb.value)].event);
+            const events = checkedPa.map(cb => PITCHING_PA[parseInt(cb.value)].event);
             url += '&hfAB=' + events.map(e => e + '%7C').join('');
         }
 
