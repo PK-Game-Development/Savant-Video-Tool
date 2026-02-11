@@ -191,7 +191,7 @@ def main():
     )
     parser.add_argument("url", help="Baseball Savant Statcast search URL")
     parser.add_argument(
-        "-o", "--output", default="videos", help="Output directory (default: videos)"
+        "-o", "--output", default=os.path.join(os.path.expanduser("~"), "Downloads"), help="Output directory (default: ~/Downloads)"
     )
     parser.add_argument(
         "--broadcast",

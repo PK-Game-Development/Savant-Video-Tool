@@ -24,7 +24,7 @@ from flask import Flask, render_template, request, jsonify, Response, send_from_
 app = Flask(__name__)
 
 # --- Config ---
-DOWNLOAD_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "videos")
+DOWNLOAD_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 STATCAST_CSV_BASE = "https://baseballsavant.mlb.com/statcast_search/csv"
 MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
 VIDEO_CDN_URL = "https://fastball-clips.mlb.com/{game_pk}/{broadcast}/{play_id}.mp4"
