@@ -1081,26 +1081,29 @@
 
         <h4>Quick Start</h4>
         <ol>
-            <li>Search for a player by name above, or paste a Baseball Savant Statcast Search URL directly into the search bar.</li>
-            <li>Select the seasons and game types you want.</li>
-            <li>Choose <span class="key">Batting</span> or <span class="key">Pitching</span>, then check the categories you want. The search URL builds automatically.</li>
-            <li>Hit <span class="key">Search</span> to fetch the matching video clips.</li>
-            <li>Check the clips you want, then click <span class="key">Download Selected</span>.</li>
+            <li>Search for a player by name, or paste a Baseball Savant Statcast Search URL directly into the search bar.</li>
+            <li>Pick one or more seasons (defaults to 2025) and game types.</li>
+            <li>Choose <span class="key">Batting</span> or <span class="key">Pitching</span> &mdash; the checkboxes swap to match.</li>
+            <li>Check the PA results you want. The search URL builds automatically.</li>
+            <li>Hit <span class="key">Search</span>, then select clips and <span class="key">Download Selected</span>.</li>
         </ol>
 
         <h4>Player Search</h4>
-        <p>Type any current or historical player name and press <span class="key">Search Player</span>. The tool will show their headshot, position, team, and links to Savant, MLB, Baseball Reference, Fangraphs, and Roster Resource.</p>
+        <p>Type any current or historical player name and press <span class="key">Search Player</span>. The tool shows their headshot, position, team, and links to Savant, MLB, Baseball Reference, Fangraphs, and Roster Resource.</p>
+
+        <h4>Game Log</h4>
+        <p>After selecting a player, expand the <span class="key">Game Log</span> section to view their batting or pitching log for any season. Click any row to load that game's video clips directly into the search results.</p>
 
         <h4>Seasons &amp; Game Types</h4>
-        <p>After finding a player, select one or more seasons (2015 &ndash; present). Then choose which game types to include &mdash; Regular Season is checked by default. You can also add Postseason, Wildcard, Division Series, League Championship, World Series, Spring Training, or All-Star games.</p>
+        <p>Select one or more seasons (2015 &ndash; present). Choose which game types to include &mdash; Regular Season is checked by default. Options include Postseason, Wildcard, Division Series, League Championship, World Series, Spring Training, and All-Star games.</p>
 
-        <h4>Category Builder</h4>
-        <p>After selecting seasons &amp; game types, pick <strong>Batting</strong> or <strong>Pitching</strong>:</p>
+        <h4>Batting vs Pitching</h4>
+        <p>The PA result checkboxes change depending on your selection:</p>
         <ul>
-            <li><strong>PA Results</strong> &mdash; Check any combination of plate-appearance outcomes (Single, Double, Home Run, Strikeout, Walk, etc.). All selections combine into one URL.</li>
-            <li><strong>Pitch Metrics</strong> <em>(Pitching only)</em> &mdash; Optionally filter by 100+ MPH, 12"+ vertical break, or 12"+ horizontal break.</li>
+            <li><strong>Batting</strong> &mdash; Organized hits-first: Single, Double, Triple, Home Run, Walk, IBB, HBP, then outs like Strikeout, Field Out, GIDP, and more.</li>
+            <li><strong>Pitching</strong> &mdash; Organized outs-first: Strikeout, K DP, Field Out, Force Out, GIDP, Double Play, then hits/walks allowed.</li>
         </ul>
-        <p>The Savant search URL updates automatically in the search bar as you change options.</p>
+        <p><strong>Pitch Metrics</strong> <em>(Pitching only)</em> &mdash; Optionally filter by 100+ MPH, 12"+ vertical break, or 12"+ horizontal break.</p>
 
         <h4>Download Options</h4>
         <ul>
@@ -1824,7 +1827,7 @@ function populateSeasonCheckboxes() {
     const currentYear = new Date().getFullYear();
     let html = '';
     for (let year = currentYear; year >= SEASON_START; year--) {
-        const checked = (year === currentYear) ? ' checked' : '';
+        const checked = (year === 2025) ? ' checked' : '';
         html += '<label class="combine-option compact">'
             + '<input type="checkbox" class="season-year-cb" value="' + year + '"'
             + checked + ' onchange="updateBuiltUrl()">'
