@@ -321,6 +321,8 @@ def api_player_search():
         mlb_id = player.get("id")
         full_name = player.get("fullName", "Unknown")
         primary_position = player.get("primaryPosition", {}).get("abbreviation", "")
+        if primary_position == "TWP":
+            primary_position = "2Way"
         active = player.get("active", False)
 
         current_team = player.get("currentTeam", {})

@@ -309,8 +309,9 @@
         .url-section-header {
             color: #F5C842;
             margin: 16px 0 8px 0;
-            font-size: 18px;
+            font-size: 24px;
             font-weight: 700;
+            text-decoration: underline;
         }
 
         .hit-type-row td {
@@ -563,7 +564,7 @@
 
     <!-- Player Search -->
     <div class="player-search-section">
-        <h3 style="color: #F5C842; margin: 0 0 16px 0; font-size: 16px;">Player Search</h3>
+        <h3 style="color: #F5C842; margin: 0 0 16px 0; font-size: 24px; text-decoration: underline;">Player Search</h3>
         <div class="search-row">
             <input type="text" id="playerName"
                    placeholder="Search by player name (e.g., Aaron Judge)..."
@@ -600,13 +601,13 @@
             <h4 style="color: #F5C842; margin: 0 0 12px 0; font-size: 16px;">Select Season(s)</h4>
             <div id="seasonCheckboxes" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;"></div>
 
-            <h4 class="url-section-header">Batting</h4>
+            <h4 class="url-section-header">Batting Video Savant Clips</h4>
             <div class="video-table-wrap"><table class="video-table">
                 <thead><tr><th>Hit Type</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
                 <tbody id="hitTypeBody"></tbody>
             </table></div>
 
-            <h4 class="url-section-header" style="margin-top: 16px;">Pitching</h4>
+            <h4 class="url-section-header" style="margin-top: 16px;">Pitching Video Savant Clips</h4>
             <div class="video-table-wrap"><table class="video-table">
                 <thead><tr><th>Category</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
                 <tbody id="pitchTypeBody"></tbody>
