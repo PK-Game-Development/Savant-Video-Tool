@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Baseball Savant Video Downloader</title>
+    <title>shorthop.app</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -33,6 +33,21 @@
             color: #7888AA;
             font-size: 14px;
             margin-top: 4px;
+        }
+
+        .header .header-support {
+            color: #7888AA;
+            font-size: 13px;
+            margin-top: 6px;
+        }
+
+        .header .header-support a {
+            color: #7AD4F0;
+            text-decoration: underline;
+        }
+
+        .header .header-support a:hover {
+            color: #9AE0F8;
         }
 
         .footer-credit {
@@ -237,6 +252,65 @@
             background: #0B1026;
             border-radius: 6px;
             border: 1px solid #1A2844;
+        }
+
+        .player-info-layout {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+        }
+
+        .player-headshot {
+            width: 110px;
+            height: 110px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: #1A2844;
+            flex-shrink: 0;
+        }
+
+        .player-info-text {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .player-info-text .player-name {
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .player-info-text .player-meta {
+            color: #7888AA;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .player-info-text .player-inactive {
+            color: #E67A8A;
+            font-size: 13px;
+        }
+
+        .player-info-links {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+
+        .player-link-btn img.link-favicon {
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+
+        .url-section-header {
+            color: #F5C842;
+            margin: 16px 0 8px 0;
+            font-size: 18px;
+            font-weight: 700;
         }
 
         .hit-type-row td {
@@ -480,8 +554,9 @@
 <body>
 
 <div class="header">
-    <h1><span>Baseball Savant</span> Video Downloader</h1>
-    <p>Paste a Statcast search URL to find and download video clips</p>
+    <h1><span>shorthop</span>.app</h1>
+    <p>a tool for baseball fans, creators, and nerds alike</p>
+    <p class="header-support">Consider supporting the developer's work and watch <a href="https://www.youtube.com/@LateNightBaseball" target="_blank">Late Night Baseball</a> on Youtube.</p>
 </div>
 
 <div class="container">
@@ -518,6 +593,24 @@
                 <label for="maxResults">Max videos:</label>
                 <input type="number" id="maxResults" value="0" min="0" placeholder="0 = all">
             </div>
+        </div>
+
+        <!-- Savant URL Builder (populated by JS after player search) -->
+        <div id="savantUrlBuilder" style="display: none; margin-top: 20px; border-top: 1px solid #1A2844; padding-top: 16px;">
+            <h4 style="color: #F5C842; margin: 0 0 12px 0; font-size: 16px;">Select Season(s)</h4>
+            <div id="seasonCheckboxes" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;"></div>
+
+            <h4 class="url-section-header">Batting</h4>
+            <div class="video-table-wrap"><table class="video-table">
+                <thead><tr><th>Hit Type</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
+                <tbody id="hitTypeBody"></tbody>
+            </table></div>
+
+            <h4 class="url-section-header" style="margin-top: 16px;">Pitching</h4>
+            <div class="video-table-wrap"><table class="video-table">
+                <thead><tr><th>Category</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
+                <tbody id="pitchTypeBody"></tbody>
+            </table></div>
         </div>
     </div>
 
@@ -586,6 +679,36 @@
 <script>
 let videoData = [];
 let currentJobId = null;
+
+const BATTING_TYPES = [
+    {label: 'Singles', params: 'single%7C'},
+    {label: 'Doubles', params: 'double%7C'},
+    {label: 'Triples', params: 'triple%7C'},
+    {label: 'Home Runs', params: 'home_run%7C'},
+];
+const PITCHING_TYPES = [
+    {label: 'Strikeouts', params: 'hfAB=strikeout%7C'},
+    {label: 'K End of Inning', params: 'hfAB=strikeout%7C&hfOuts=2%7C'},
+    {label: '100+ MPH', params: 'metric_1=api_p_release_speed&metric_1_gt=100'},
+    {label: '12"+ Vertical Break', params: 'metric_1=api_p_induced_break_z&metric_1_gt=12'},
+    {label: '12"+ Horizontal Break', params: 'metric_1=api_p_break_x_arm&metric_1_gt=12'},
+    {label: 'Home Runs Allowed', params: 'hfAB=home_run%7C'},
+    {label: 'RBIs Allowed', params: 'hfAB=single%7Cdouble%7Ctriple%7Chome_run%7Csac_fly%7C'},
+];
+const SEASON_START = 2015;
+
+function buildSavantUrl(mlbId, playerType, extraParams, checkedYears) {
+    if (checkedYears.length === 0) return '';
+    const seasonsStr = checkedYears.join('%7C') + '%7C';
+    const base = 'https://baseballsavant.mlb.com/statcast_search';
+    if (playerType === 'batter') {
+        return base + '?hfAB=' + extraParams + '&hfSea=' + seasonsStr
+            + '&player_type=batter&batters_lookup%5B%5D=' + mlbId + '&hfGT=R%7C';
+    } else {
+        return base + '?player_type=pitcher&pitchers_lookup%5B%5D=' + mlbId
+            + '&hfGT=R%7C&hfSea=' + seasonsStr + '&' + extraParams;
+    }
+}
 
 function showStatus(msg, type) {
     const el = document.getElementById('statusMsg');
@@ -919,6 +1042,7 @@ async function doPlayerSearch() {
     document.getElementById('progressSection').classList.remove('show');
     document.getElementById('saveBtn').classList.remove('show');
     document.getElementById('searchUrl').value = '';
+    document.getElementById('savantUrlBuilder').style.display = 'none';
 
     try {
         const resp = await fetch('/api/player-search', {
@@ -987,60 +1111,72 @@ function renderPlayerDetail(index) {
     if (!player) return;
 
     const detail = document.getElementById('playerDetail');
-    const meta = [player.position, player.team].filter(Boolean).join(' | ');
-    const activeLabel = player.active ? '' : ' <span style="color: #E67A8A;">(Inactive)</span>';
-    const currentYear = new Date().getFullYear();
-    const lastYear = currentYear - 1;
 
-    let html = '';
+    // Build metadata: Position | Team | Age
+    const metaParts = [];
+    if (player.position) metaParts.push(player.position);
+    if (player.team) metaParts.push(player.team);
+    if (player.age) metaParts.push('Age ' + player.age);
+    const metaStr = metaParts.join(' | ');
 
-    // Player info card
-    html += '<div class="player-card">';
-    html += '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">';
-    html += '<div>';
-    html += '<span style="font-size: 18px; font-weight: 600; color: #fff;">' + esc(player.name) + '</span>' + activeLabel;
-    if (meta) html += '<span style="color: #7888AA; margin-left: 12px;">' + esc(meta) + '</span>';
-    html += '</div>';
+    let html = '<div class="player-card">';
+    html += '<div class="player-info-layout">';
 
-    // External links
-    html += '<div style="display: flex; gap: 8px; flex-wrap: wrap;">';
+    // Headshot
+    if (player.headshot_url) {
+        html += '<img src="' + esc(player.headshot_url) + '" alt="' + esc(player.name) + '" class="player-headshot"'
+            + ' onerror="this.style.display=\'none\'">';
+    }
+
+    // Name, meta, inactive label
+    html += '<div class="player-info-text">';
+    html += '<div class="player-name">' + esc(player.name) + '</div>';
+    if (metaStr) html += '<div class="player-meta">' + esc(metaStr) + '</div>';
+    if (!player.active) html += '<div class="player-inactive">(Inactive)</div>';
+
+    // Research links with favicons
+    html += '<div class="player-info-links">';
     const linkDefs = [
-        {key: 'savant', label: 'Baseball Savant'},
-        {key: 'mlb', label: 'MLB.com'},
-        {key: 'bbref', label: 'Baseball Ref'},
-        {key: 'fangraphs', label: 'Fangraphs'},
-        {key: 'roster_resource', label: 'Roster Resource'},
+        {key: 'savant', label: 'Baseball Savant', domain: 'baseballsavant.mlb.com'},
+        {key: 'mlb', label: 'MLB.com', domain: 'mlb.com'},
+        {key: 'bbref', label: 'Baseball Ref', domain: 'baseball-reference.com'},
+        {key: 'fangraphs', label: 'Fangraphs', domain: 'fangraphs.com'},
+        {key: 'roster_resource', label: 'Roster Resource', domain: 'fangraphs.com'},
     ];
     for (const def of linkDefs) {
         const url = player.links[def.key];
         if (url) {
-            html += '<a href="' + esc(url) + '" target="_blank" class="player-link-btn">' + def.label + '</a>';
+            const faviconUrl = 'https://www.google.com/s2/favicons?domain=' + def.domain + '&sz=32';
+            html += '<a href="' + esc(url) + '" target="_blank" class="player-link-btn">'
+                + '<img src="' + faviconUrl + '" class="link-favicon" alt="">'
+                + def.label + '</a>';
         }
     }
-    html += '</div></div></div>';
-
-    // Season checkboxes
-    html += '<div style="margin-top: 16px; display: flex; gap: 16px; align-items: center;">';
-    html += '<label class="combine-option"><input type="checkbox" id="seasonCurrent" onchange="updateSavantUrls()">';
-    html += '<span>' + currentYear + ' (Current Season)</span></label>';
-    html += '<label class="combine-option"><input type="checkbox" id="seasonLast" onchange="updateSavantUrls()">';
-    html += '<span>' + lastYear + ' (Last Season)</span></label>';
-    html += '</div>';
-
-    // Batting URL table
-    html += '<h4 style="color: #F5C842; margin: 16px 0 8px 0; font-size: 14px;">Batting</h4>';
-    html += '<div class="video-table-wrap"><table class="video-table">';
-    html += '<thead><tr><th>Hit Type</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>';
-    html += '<tbody id="hitTypeBody"></tbody></table></div>';
-
-    // Pitching URL table
-    html += '<h4 style="color: #F5C842; margin: 16px 0 8px 0; font-size: 14px;">Pitching</h4>';
-    html += '<div class="video-table-wrap"><table class="video-table">';
-    html += '<thead><tr><th>Category</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>';
-    html += '<tbody id="pitchTypeBody"></tbody></table></div>';
+    html += '</div>'; // .player-info-links
+    html += '</div>'; // .player-info-text
+    html += '</div>'; // .player-info-layout
+    html += '</div>'; // .player-card
 
     detail.innerHTML = html;
+
+    // Show and populate the season/URL builder in the search section
+    populateSeasonCheckboxes();
+    document.getElementById('savantUrlBuilder').style.display = 'block';
     updateSavantUrls();
+}
+
+function populateSeasonCheckboxes() {
+    const container = document.getElementById('seasonCheckboxes');
+    const currentYear = new Date().getFullYear();
+    let html = '';
+    for (let year = currentYear; year >= SEASON_START; year--) {
+        const checked = (year === currentYear) ? ' checked' : '';
+        html += '<label class="combine-option">'
+            + '<input type="checkbox" class="season-year-cb" value="' + year + '"'
+            + checked + ' onchange="updateSavantUrls()">'
+            + '<span>' + year + '</span></label>';
+    }
+    container.innerHTML = html;
 }
 
 function updateSavantUrls() {
@@ -1051,32 +1187,22 @@ function updateSavantUrls() {
     const pitchBody = document.getElementById('pitchTypeBody');
     if (!hitBody || !pitchBody) return;
 
-    const currentChecked = document.getElementById('seasonCurrent')?.checked;
-    const lastChecked = document.getElementById('seasonLast')?.checked;
+    // Gather checked years
+    const checkedYears = [];
+    document.querySelectorAll('.season-year-cb:checked').forEach(cb => {
+        checkedYears.push(cb.value);
+    });
 
-    if (!currentChecked && !lastChecked) {
-        hitBody.innerHTML = '';
-        pitchBody.innerHTML = '';
+    if (checkedYears.length === 0) {
+        hitBody.innerHTML = '<tr><td colspan="3" style="color: #7888AA; text-align: center; padding: 16px;">Select at least one season above</td></tr>';
+        pitchBody.innerHTML = '<tr><td colspan="3" style="color: #7888AA; text-align: center; padding: 16px;">Select at least one season above</td></tr>';
         return;
     }
 
-    const currentYear = new Date().getFullYear();
-    const lastYear = currentYear - 1;
-
-    let seasonKey;
-    if (currentChecked && lastChecked) {
-        seasonKey = lastYear + '-' + currentYear;
-    } else if (currentChecked) {
-        seasonKey = '' + currentYear;
-    } else {
-        seasonKey = '' + lastYear;
-    }
-
-    function buildRows(types) {
+    function buildRows(types, playerType) {
         let html = '';
         for (const t of types) {
-            const urlKey = t.key + '_' + seasonKey;
-            const url = player.savant_urls[urlKey] || '';
+            const url = buildSavantUrl(player.mlb_id, playerType, t.params, checkedYears);
             const truncated = url.length > 70 ? url.substring(0, 70) + '...' : url;
             html += '<tr class="hit-type-row">';
             html += '<td class="hit-type-label">' + esc(t.label) + '</td>';
@@ -1087,25 +1213,8 @@ function updateSavantUrls() {
         return html;
     }
 
-    const hitTypes = [
-        {label: 'Singles', key: 'Singles'},
-        {label: 'Doubles', key: 'Doubles'},
-        {label: 'Triples', key: 'Triples'},
-        {label: 'Home Runs', key: 'Home Runs'},
-    ];
-
-    const pitchTypes = [
-        {label: 'Strikeouts', key: 'P_Strikeouts'},
-        {label: 'K End of Inning', key: 'P_K End of Inning'},
-        {label: '100+ MPH', key: 'P_100+ MPH'},
-        {label: '12"+ Vertical Break', key: 'P_12in+ Vertical Break'},
-        {label: '12"+ Horizontal Break', key: 'P_12in+ Horizontal Break'},
-        {label: 'Home Runs Allowed', key: 'P_Home Runs Allowed'},
-        {label: 'RBIs Allowed', key: 'P_RBIs Allowed'},
-    ];
-
-    hitBody.innerHTML = buildRows(hitTypes);
-    pitchBody.innerHTML = buildRows(pitchTypes);
+    hitBody.innerHTML = buildRows(BATTING_TYPES, 'batter');
+    pitchBody.innerHTML = buildRows(PITCHING_TYPES, 'pitcher');
 }
 
 function useUrl(btn) {

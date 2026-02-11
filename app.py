@@ -293,7 +293,7 @@ def index():
 
 @app.route("/api/player-search", methods=["POST"])
 def api_player_search():
-    """Search for MLB players by name and return info + pre-built Savant URLs."""
+    """Search for MLB players by name and return player info."""
     data = request.get_json()
     name = data.get("name", "").strip()
 
@@ -316,9 +316,6 @@ def api_player_search():
 
     people = people[:10]
 
-    current_year = datetime.now().year
-    last_year = current_year - 1
-
     results = []
     for player in people:
         mlb_id = player.get("id")
@@ -329,6 +326,23 @@ def api_player_search():
         current_team = player.get("currentTeam", {})
         team_id = current_team.get("id")
         team_name = current_team.get("name", "")
+
+        # Extract birth date and calculate age
+        birth_date_str = player.get("birthDate", "")
+        age = None
+        if birth_date_str:
+            try:
+                bd = datetime.strptime(birth_date_str, "%Y-%m-%d")
+                today = datetime.now()
+                age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+            except ValueError:
+                age = None
+
+        headshot_url = (
+            f"https://img.mlbstatic.com/mlb-photos/image/upload/"
+            f"d_people:generic:headshot:67:current.png/"
+            f"w_213,q_auto:best/v1/people/{mlb_id}/headshot/67/current"
+        )
 
         # Extract Fangraphs ID from cross-reference IDs
         fg_id = None
@@ -352,54 +366,6 @@ def api_player_search():
             slug = FANGRAPHS_TEAM_SLUGS[team_id]
             links["roster_resource"] = f"https://www.fangraphs.com/roster-resource/depth-charts/{slug}"
 
-        # Pre-generated Savant statcast search URLs for hit types x seasons
-        savant_urls = {}
-        hit_types = [
-            ("Singles", "single"),
-            ("Doubles", "double"),
-            ("Triples", "triple"),
-            ("Home Runs", "home_run"),
-        ]
-        season_combos = [
-            (str(current_year), f"{current_year}%7C"),
-            (str(last_year), f"{last_year}%7C"),
-            (f"{last_year}-{current_year}", f"{last_year}%7C{current_year}%7C"),
-        ]
-
-        for label, event_code in hit_types:
-            for season_label, seasons_str in season_combos:
-                key = f"{label}_{season_label}"
-                savant_urls[key] = (
-                    f"https://baseballsavant.mlb.com/statcast_search"
-                    f"?hfAB={event_code}%7C"
-                    f"&hfSea={seasons_str}"
-                    f"&player_type=batter"
-                    f"&batters_lookup%5B%5D={mlb_id}"
-                    f"&hfGT=R%7C"
-                )
-
-        # Pitcher Savant URLs
-        pitcher_base = (
-            f"https://baseballsavant.mlb.com/statcast_search"
-            f"?player_type=pitcher"
-            f"&pitchers_lookup%5B%5D={mlb_id}"
-            f"&hfGT=R%7C"
-        )
-        pitcher_types = [
-            ("P_Strikeouts", "hfAB=strikeout%7C"),
-            ("P_K End of Inning", "hfAB=strikeout%7C&hfOuts=2%7C"),
-            ("P_100+ MPH", "metric_1=api_p_release_speed&metric_1_gt=100"),
-            ("P_12in+ Vertical Break", "metric_1=api_p_induced_break_z&metric_1_gt=12"),
-            ("P_12in+ Horizontal Break", "metric_1=api_p_break_x_arm&metric_1_gt=12"),
-            ("P_Home Runs Allowed", "hfAB=home_run%7C"),
-            ("P_RBIs Allowed", "hfAB=single%7Cdouble%7Ctriple%7Chome_run%7Csac_fly%7C"),
-        ]
-
-        for label, extra_params in pitcher_types:
-            for season_label, seasons_str in season_combos:
-                key = f"{label}_{season_label}"
-                savant_urls[key] = f"{pitcher_base}&hfSea={seasons_str}&{extra_params}"
-
         results.append({
             "mlb_id": mlb_id,
             "name": full_name,
@@ -407,8 +373,9 @@ def api_player_search():
             "active": active,
             "team": team_name,
             "team_id": team_id,
+            "age": age,
+            "headshot_url": headshot_url,
             "links": links,
-            "savant_urls": savant_urls,
         })
 
     return jsonify({"players": results})
