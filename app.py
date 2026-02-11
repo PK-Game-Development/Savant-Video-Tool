@@ -37,40 +37,40 @@ STATCAST_CSV_BASE = "https://baseballsavant.mlb.com/statcast_search/csv"
 MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
 VIDEO_CDN_URL = "https://fastball-clips.mlb.com/{game_pk}/{broadcast}/{play_id}.mp4"
 SPORTY_VIDEO_URL = "https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
-MLB_PLAYER_SEARCH_URL = "https://statsapi.mlb.com/api/v1/people/search?names={name}&hydrate=currentTeam"
+MLB_PLAYER_SEARCH_URL = "https://statsapi.mlb.com/api/v1/people/search?names={name}&hydrate=currentTeam,xrefId"
 
-# MLB team ID -> Roster Resource URL slug
-ROSTER_RESOURCE_SLUGS = {
-    108: "los-angeles-angels",
-    109: "arizona-diamondbacks",
-    110: "baltimore-orioles",
-    111: "boston-red-sox",
-    112: "chicago-cubs",
-    113: "cincinnati-reds",
-    114: "cleveland-guardians",
-    115: "colorado-rockies",
-    116: "detroit-tigers",
-    117: "houston-astros",
-    118: "kansas-city-royals",
-    119: "los-angeles-dodgers",
-    120: "washington-nationals",
-    121: "new-york-mets",
-    133: "oakland-athletics",
-    134: "pittsburgh-pirates",
-    135: "san-diego-padres",
-    136: "seattle-mariners",
-    137: "san-francisco-giants",
-    138: "st-louis-cardinals",
-    139: "tampa-bay-rays",
-    140: "texas-rangers",
-    141: "toronto-blue-jays",
-    142: "minnesota-twins",
-    143: "philadelphia-phillies",
-    144: "atlanta-braves",
-    145: "chicago-white-sox",
-    146: "miami-marlins",
-    147: "new-york-yankees",
-    158: "milwaukee-brewers",
+# MLB team ID -> Fangraphs depth chart slug (team nickname only)
+FANGRAPHS_TEAM_SLUGS = {
+    108: "angels",
+    109: "diamondbacks",
+    110: "orioles",
+    111: "red-sox",
+    112: "cubs",
+    113: "reds",
+    114: "guardians",
+    115: "rockies",
+    116: "tigers",
+    117: "astros",
+    118: "royals",
+    119: "dodgers",
+    120: "nationals",
+    121: "mets",
+    133: "athletics",
+    134: "pirates",
+    135: "padres",
+    136: "mariners",
+    137: "giants",
+    138: "cardinals",
+    139: "rays",
+    140: "rangers",
+    141: "blue-jays",
+    142: "twins",
+    143: "phillies",
+    144: "braves",
+    145: "white-sox",
+    146: "marlins",
+    147: "yankees",
+    158: "brewers",
 }
 
 # Base temp directory for all jobs
@@ -330,17 +330,27 @@ def api_player_search():
         team_id = current_team.get("id")
         team_name = current_team.get("name", "")
 
+        # Extract Fangraphs ID from cross-reference IDs
+        fg_id = None
+        for xref in player.get("xrefIds", []):
+            if xref.get("xrefType") == "fangraphs":
+                fg_id = xref.get("xrefId")
+                break
+
         # External links
         links = {
             "savant": f"https://baseballsavant.mlb.com/savant-player/{mlb_id}",
             "mlb": f"https://www.mlb.com/player/{mlb_id}",
             "bbref": f"https://www.baseball-reference.com/search/search.fcgi?search={requests.utils.quote(full_name)}",
-            "fangraphs": f"https://www.fangraphs.com/players?search={requests.utils.quote(full_name)}",
         }
 
-        if team_id and team_id in ROSTER_RESOURCE_SLUGS:
-            slug = ROSTER_RESOURCE_SLUGS[team_id]
-            links["roster_resource"] = f"https://www.rosterresource.com/mlb-{slug}/"
+        if fg_id:
+            name_slug = re.sub(r"[^a-z0-9-]", "", full_name.lower().replace(" ", "-"))
+            links["fangraphs"] = f"https://www.fangraphs.com/players/{name_slug}/{fg_id}/stats"
+
+        if team_id and team_id in FANGRAPHS_TEAM_SLUGS:
+            slug = FANGRAPHS_TEAM_SLUGS[team_id]
+            links["roster_resource"] = f"https://www.fangraphs.com/roster-resource/depth-charts/{slug}"
 
         # Pre-generated Savant statcast search URLs for hit types x seasons
         savant_urls = {}
