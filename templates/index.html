@@ -203,6 +203,85 @@
 
         .btn-select:hover:not(:disabled) { background: #2A3855; }
 
+        /* Player Search */
+        .player-search-section {
+            background: #111A33;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .player-link-btn {
+            padding: 6px 14px;
+            border: 1px solid #2A3855;
+            border-radius: 4px;
+            background: #1A2844;
+            color: #7AD4F0;
+            font-size: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+
+        .player-link-btn:hover {
+            background: #2A3855;
+            border-color: #5EC4E6;
+            color: #fff;
+        }
+
+        .player-card {
+            margin-top: 16px;
+            padding: 16px;
+            background: #0B1026;
+            border-radius: 6px;
+            border: 1px solid #1A2844;
+        }
+
+        .hit-type-row td {
+            padding: 10px 12px;
+            font-size: 13px;
+        }
+
+        .hit-type-label {
+            color: #F5C842;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .hit-type-url {
+            max-width: 500px;
+            word-break: break-all;
+        }
+
+        .hit-type-url a {
+            color: #7AD4F0;
+            text-decoration: underline;
+            font-size: 12px;
+        }
+
+        .hit-type-url a:hover {
+            color: #9AE0F8;
+        }
+
+        .btn-use-url {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 4px;
+            background: #5EC4E6;
+            color: #0B1026;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-use-url:hover {
+            background: #7AD0EC;
+        }
+
         /* Status Messages */
         .status {
             padding: 12px 16px;
@@ -407,7 +486,19 @@
 
 <div class="container">
 
-    <!-- Search -->
+    <!-- Player Search -->
+    <div class="player-search-section">
+        <h3 style="color: #F5C842; margin: 0 0 16px 0; font-size: 16px;">Player Search</h3>
+        <div class="search-row">
+            <input type="text" id="playerName"
+                   placeholder="Search by player name (e.g., Aaron Judge)..."
+                   spellcheck="false">
+            <button class="btn btn-search" id="playerSearchBtn" onclick="doPlayerSearch()">Search Player</button>
+        </div>
+        <div id="playerResults" style="display: none;"></div>
+    </div>
+
+    <!-- Savant URL Search -->
     <div class="search-section">
         <div class="search-row">
             <input type="text" id="searchUrl"
@@ -799,6 +890,199 @@ function saveFile() {
 document.getElementById('searchUrl').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') doSearch();
 });
+
+// --- Player Search ---
+let playerSearchResults = [];
+let selectedPlayerIndex = 0;
+
+document.getElementById('playerName').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doPlayerSearch();
+});
+
+async function doPlayerSearch() {
+    const name = document.getElementById('playerName').value.trim();
+    if (!name || name.length < 2) {
+        showStatus('Please enter at least 2 characters for player search.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('playerSearchBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Searching...';
+    hideStatus();
+    document.getElementById('playerResults').style.display = 'none';
+
+    try {
+        const resp = await fetch('/api/player-search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name}),
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            showStatus(data.error || 'Player search failed.', 'error');
+            return;
+        }
+
+        playerSearchResults = data.players;
+        selectedPlayerIndex = 0;
+        renderPlayerResults();
+        document.getElementById('playerResults').style.display = 'block';
+
+        if (playerSearchResults.length === 1) {
+            showStatus('Found player: ' + playerSearchResults[0].name, 'success');
+        } else {
+            showStatus('Found ' + playerSearchResults.length + ' players matching "' + esc(name) + '".', 'success');
+        }
+    } catch (err) {
+        showStatus('Network error: ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Search Player';
+    }
+}
+
+function renderPlayerResults() {
+    const container = document.getElementById('playerResults');
+    const players = playerSearchResults;
+    if (!players || players.length === 0) { container.innerHTML = ''; return; }
+
+    let html = '';
+
+    // Dropdown if multiple results
+    if (players.length > 1) {
+        html += '<div style="margin-bottom: 12px;">';
+        html += '<label style="color: #7888AA; font-size: 13px;">Select player: </label>';
+        html += '<select id="playerSelect" onchange="selectPlayer(parseInt(this.value))" ';
+        html += 'style="padding: 8px 12px; border: 2px solid #1A2844; border-radius: 6px; background: #0B1026; color: #fff; font-size: 13px; margin-left: 8px;">';
+        players.forEach((p, i) => {
+            const meta = [p.position, p.team].filter(Boolean).join(' | ');
+            const label = meta ? p.name + ' (' + meta + ')' : p.name;
+            html += '<option value="' + i + '">' + esc(label) + '</option>';
+        });
+        html += '</select></div>';
+    }
+
+    html += '<div id="playerDetail"></div>';
+    container.innerHTML = html;
+    renderPlayerDetail(selectedPlayerIndex);
+}
+
+function selectPlayer(index) {
+    selectedPlayerIndex = index;
+    renderPlayerDetail(index);
+}
+
+function renderPlayerDetail(index) {
+    const player = playerSearchResults[index];
+    if (!player) return;
+
+    const detail = document.getElementById('playerDetail');
+    const meta = [player.position, player.team].filter(Boolean).join(' | ');
+    const activeLabel = player.active ? '' : ' <span style="color: #E67A8A;">(Inactive)</span>';
+    const currentYear = new Date().getFullYear();
+    const lastYear = currentYear - 1;
+
+    let html = '';
+
+    // Player info card
+    html += '<div class="player-card">';
+    html += '<div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">';
+    html += '<div>';
+    html += '<span style="font-size: 18px; font-weight: 600; color: #fff;">' + esc(player.name) + '</span>' + activeLabel;
+    if (meta) html += '<span style="color: #7888AA; margin-left: 12px;">' + esc(meta) + '</span>';
+    html += '</div>';
+
+    // External links
+    html += '<div style="display: flex; gap: 8px; flex-wrap: wrap;">';
+    const linkDefs = [
+        {key: 'savant', label: 'Baseball Savant'},
+        {key: 'mlb', label: 'MLB.com'},
+        {key: 'bbref', label: 'Baseball Ref'},
+        {key: 'fangraphs', label: 'Fangraphs'},
+        {key: 'roster_resource', label: 'Roster Resource'},
+    ];
+    for (const def of linkDefs) {
+        const url = player.links[def.key];
+        if (url) {
+            html += '<a href="' + esc(url) + '" target="_blank" class="player-link-btn">' + def.label + '</a>';
+        }
+    }
+    html += '</div></div></div>';
+
+    // Season checkboxes
+    html += '<div style="margin-top: 16px; display: flex; gap: 16px; align-items: center;">';
+    html += '<label class="combine-option"><input type="checkbox" id="seasonCurrent" checked onchange="updateSavantUrls()">';
+    html += '<span>' + currentYear + ' (Current Season)</span></label>';
+    html += '<label class="combine-option"><input type="checkbox" id="seasonLast" onchange="updateSavantUrls()">';
+    html += '<span>' + lastYear + ' (Last Season)</span></label>';
+    html += '</div>';
+
+    // Hit type URL table
+    html += '<div style="margin-top: 16px;"><div class="video-table-wrap"><table class="video-table">';
+    html += '<thead><tr><th>Hit Type</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>';
+    html += '<tbody id="hitTypeBody"></tbody></table></div></div>';
+
+    detail.innerHTML = html;
+    updateSavantUrls();
+}
+
+function updateSavantUrls() {
+    const player = playerSearchResults[selectedPlayerIndex];
+    if (!player) return;
+
+    const currentChecked = document.getElementById('seasonCurrent')?.checked;
+    const lastChecked = document.getElementById('seasonLast')?.checked;
+    const currentYear = new Date().getFullYear();
+    const lastYear = currentYear - 1;
+
+    let seasonKey;
+    if (currentChecked && lastChecked) {
+        seasonKey = lastYear + '-' + currentYear;
+    } else if (currentChecked) {
+        seasonKey = '' + currentYear;
+    } else if (lastChecked) {
+        seasonKey = '' + lastYear;
+    } else {
+        seasonKey = '' + currentYear;
+    }
+
+    const hitTypes = [
+        {label: 'Singles', key: 'Singles'},
+        {label: 'Doubles', key: 'Doubles'},
+        {label: 'Triples', key: 'Triples'},
+        {label: 'Home Runs', key: 'Home Runs'},
+    ];
+
+    const tbody = document.getElementById('hitTypeBody');
+    if (!tbody) return;
+
+    let html = '';
+    for (const ht of hitTypes) {
+        const urlKey = ht.key + '_' + seasonKey;
+        const url = player.savant_urls[urlKey] || '';
+        const truncated = url.length > 70 ? url.substring(0, 70) + '...' : url;
+
+        html += '<tr class="hit-type-row">';
+        html += '<td class="hit-type-label">' + esc(ht.label) + '</td>';
+        html += '<td class="hit-type-url"><a href="' + esc(url) + '" target="_blank">' + esc(truncated) + '</a></td>';
+        html += '<td style="text-align: center;"><button class="btn-use-url" onclick="useUrl(this)" data-url="' + esc(url) + '">Use This URL</button></td>';
+        html += '</tr>';
+    }
+    tbody.innerHTML = html;
+}
+
+function useUrl(btn) {
+    const url = btn.getAttribute('data-url');
+    const searchInput = document.getElementById('searchUrl');
+    searchInput.value = url;
+    searchInput.scrollIntoView({behavior: 'smooth', block: 'center'});
+    searchInput.style.borderColor = '#F5C842';
+    searchInput.focus();
+    setTimeout(() => { searchInput.style.borderColor = ''; }, 2000);
+    showStatus('URL loaded into search bar. Click "Search" to find videos.', 'info');
+}
 </script>
 
 <div class="footer-credit">

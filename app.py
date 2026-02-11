@@ -22,6 +22,7 @@ import time
 import uuid
 import zipfile
 from collections import defaultdict
+from datetime import datetime
 from urllib.parse import urlparse, parse_qs, urlencode
 
 import requests
@@ -36,6 +37,41 @@ STATCAST_CSV_BASE = "https://baseballsavant.mlb.com/statcast_search/csv"
 MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
 VIDEO_CDN_URL = "https://fastball-clips.mlb.com/{game_pk}/{broadcast}/{play_id}.mp4"
 SPORTY_VIDEO_URL = "https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
+MLB_PLAYER_SEARCH_URL = "https://statsapi.mlb.com/api/v1/people/search?names={name}&hydrate=currentTeam"
+
+# MLB team ID -> Roster Resource URL slug
+ROSTER_RESOURCE_SLUGS = {
+    108: "los-angeles-angels",
+    109: "arizona-diamondbacks",
+    110: "baltimore-orioles",
+    111: "boston-red-sox",
+    112: "chicago-cubs",
+    113: "cincinnati-reds",
+    114: "cleveland-guardians",
+    115: "colorado-rockies",
+    116: "detroit-tigers",
+    117: "houston-astros",
+    118: "kansas-city-royals",
+    119: "los-angeles-dodgers",
+    120: "washington-nationals",
+    121: "new-york-mets",
+    133: "oakland-athletics",
+    134: "pittsburgh-pirates",
+    135: "san-diego-padres",
+    136: "seattle-mariners",
+    137: "san-francisco-giants",
+    138: "st-louis-cardinals",
+    139: "tampa-bay-rays",
+    140: "texas-rangers",
+    141: "toronto-blue-jays",
+    142: "minnesota-twins",
+    143: "philadelphia-phillies",
+    144: "atlanta-braves",
+    145: "chicago-white-sox",
+    146: "miami-marlins",
+    147: "new-york-yankees",
+    158: "milwaukee-brewers",
+}
 
 # Base temp directory for all jobs
 WORK_DIR = os.path.join(tempfile.gettempdir(), "savant_jobs")
@@ -253,6 +289,97 @@ def cleanup_old_jobs():
 @app.route("/")
 def index():
     return render_template("index.html")
+
+
+@app.route("/api/player-search", methods=["POST"])
+def api_player_search():
+    """Search for MLB players by name and return info + pre-built Savant URLs."""
+    data = request.get_json()
+    name = data.get("name", "").strip()
+
+    if not name or len(name) < 2:
+        return jsonify({"error": "Please enter at least 2 characters."}), 400
+
+    session = create_session()
+
+    try:
+        search_url = MLB_PLAYER_SEARCH_URL.format(name=requests.utils.quote(name))
+        resp = session.get(search_url, timeout=15)
+        resp.raise_for_status()
+        api_data = resp.json()
+    except Exception as e:
+        return jsonify({"error": f"MLB API error: {e}"}), 500
+
+    people = api_data.get("people", [])
+    if not people:
+        return jsonify({"error": f"No players found matching '{name}'."}), 404
+
+    people = people[:10]
+
+    current_year = datetime.now().year
+    last_year = current_year - 1
+
+    results = []
+    for player in people:
+        mlb_id = player.get("id")
+        full_name = player.get("fullName", "Unknown")
+        primary_position = player.get("primaryPosition", {}).get("abbreviation", "")
+        active = player.get("active", False)
+
+        current_team = player.get("currentTeam", {})
+        team_id = current_team.get("id")
+        team_name = current_team.get("name", "")
+
+        # External links
+        links = {
+            "savant": f"https://baseballsavant.mlb.com/savant-player/{mlb_id}",
+            "mlb": f"https://www.mlb.com/player/{mlb_id}",
+            "bbref": f"https://www.baseball-reference.com/search/search.fcgi?search={requests.utils.quote(full_name)}",
+            "fangraphs": f"https://www.fangraphs.com/players?search={requests.utils.quote(full_name)}",
+        }
+
+        if team_id and team_id in ROSTER_RESOURCE_SLUGS:
+            slug = ROSTER_RESOURCE_SLUGS[team_id]
+            links["roster_resource"] = f"https://www.rosterresource.com/mlb-{slug}/"
+
+        # Pre-generated Savant statcast search URLs for hit types x seasons
+        savant_urls = {}
+        hit_types = [
+            ("Singles", "single"),
+            ("Doubles", "double"),
+            ("Triples", "triple"),
+            ("Home Runs", "home_run"),
+        ]
+        season_combos = [
+            (str(current_year), f"{current_year}%7C"),
+            (str(last_year), f"{last_year}%7C"),
+            (f"{last_year}-{current_year}", f"{last_year}%7C{current_year}%7C"),
+        ]
+
+        for label, event_code in hit_types:
+            for season_label, seasons_str in season_combos:
+                key = f"{label}_{season_label}"
+                savant_urls[key] = (
+                    f"https://baseballsavant.mlb.com/statcast_search"
+                    f"?hfAB={event_code}%7C"
+                    f"&hfSea={seasons_str}"
+                    f"&player_type=batter"
+                    f"&batters_lookup%5B%5D={mlb_id}"
+                    f"&hfGT=R%7C"
+                )
+
+        results.append({
+            "mlb_id": mlb_id,
+            "name": full_name,
+            "position": primary_position,
+            "active": active,
+            "team": team_name,
+            "team_id": team_id,
+            "links": links,
+            "savant_urls": savant_urls,
+        })
+
+    return jsonify({"players": results})
 
 
 @app.route("/api/search", methods=["POST"])
