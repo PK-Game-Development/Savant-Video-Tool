@@ -960,6 +960,7 @@
                     <option value="pitching">Pitching</option>
                 </select>
                 <button class="btn-fetch-log" id="fetchLogBtn" onclick="fetchGameLog()">Load Game Log</button>
+                <button class="btn-fetch-log" id="exportLogBtn" onclick="exportGameLog()" style="background: #5EC4E6; display: none;">Export XLSX</button>
             </div>
             <div class="game-log-scroll">
                 <div id="gameLogContent" class="game-log-empty">Select a season and click "Load Game Log"</div>
@@ -1596,9 +1597,14 @@ function useUrl(btn) {
 
 // --- Game Log ---
 let gameLogPlayerId = null;
+let gameLogPlayerName = '';
+let lastGameLogData = null;
 
 function showGameLogSection(player) {
     gameLogPlayerId = player.mlb_id;
+    gameLogPlayerName = player.name;
+    lastGameLogData = null;
+    document.getElementById('exportLogBtn').style.display = 'none';
     const section = document.getElementById('gameLogSection');
     section.classList.add('show');
 
@@ -1657,19 +1663,27 @@ function fetchGameLog() {
 
         if (data.error) {
             content.innerHTML = '<div class="game-log-empty">' + esc(data.error) + '</div>';
+            lastGameLogData = null;
+            document.getElementById('exportLogBtn').style.display = 'none';
             return;
         }
         if (!data.games || data.games.length === 0) {
             content.innerHTML = '<div class="game-log-empty">No games found for this season.</div>';
+            lastGameLogData = null;
+            document.getElementById('exportLogBtn').style.display = 'none';
             return;
         }
 
+        lastGameLogData = {games: data.games, group: data.group, season: season};
         content.innerHTML = renderGameLogTable(data.games, data.group);
+        document.getElementById('exportLogBtn').style.display = '';
     })
     .catch(err => {
         btn.disabled = false;
         btn.textContent = 'Load Game Log';
         content.innerHTML = '<div class="game-log-empty">Error loading game log.</div>';
+        lastGameLogData = null;
+        document.getElementById('exportLogBtn').style.display = 'none';
     });
 }
 
@@ -1731,6 +1745,46 @@ function renderGameLogTable(games, group) {
 
     html += '</tbody></table>';
     return html;
+}
+
+function exportGameLog() {
+    if (!lastGameLogData) return;
+    const btn = document.getElementById('exportLogBtn');
+    btn.disabled = true;
+    btn.textContent = 'Exporting...';
+
+    fetch('/api/game-log/export', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            games: lastGameLogData.games,
+            group: lastGameLogData.group,
+            season: lastGameLogData.season,
+            player_name: gameLogPlayerName,
+        }),
+    })
+    .then(r => {
+        if (!r.ok) throw new Error('Export failed');
+        return r.blob();
+    })
+    .then(blob => {
+        btn.disabled = false;
+        btn.textContent = 'Export XLSX';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeName = gameLogPlayerName.replace(/[^a-zA-Z0-9 _-]/g, '').replace(/ /g, '_');
+        a.download = safeName + '_' + lastGameLogData.season + '_game_log.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.textContent = 'Export XLSX';
+        showStatus('Failed to export game log.', 'error');
+    });
 }
 </script>
 

@@ -26,6 +26,8 @@ from datetime import datetime
 from urllib.parse import urlparse, parse_qs, urlencode
 
 import requests
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from flask import (
     Flask, render_template, request, jsonify, Response, send_file, abort,
 )
@@ -707,6 +709,103 @@ def api_game_log():
         games.append(game)
 
     return jsonify({"games": games, "group": group})
+
+
+@app.route("/api/game-log/export", methods=["POST"])
+def api_game_log_export():
+    """Export game log data as an XLSX file."""
+    data = request.get_json()
+    games = data.get("games", [])
+    group = data.get("group", "hitting")
+    player_name = data.get("player_name", "Player")
+    season = data.get("season", "")
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"{season} Game Log"
+
+    # Header style
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="1A2844", end_color="1A2844", fill_type="solid")
+    header_align = Alignment(horizontal="center")
+    thin_border = Border(
+        bottom=Side(style="thin", color="CCCCCC"),
+    )
+
+    # Title row
+    title_font = Font(bold=True, size=13, color="0B1026")
+    title_fill = PatternFill(start_color="F5C842", end_color="F5C842", fill_type="solid")
+
+    if group == "hitting":
+        headers = ["Date", "Opp", "AB", "R", "H", "2B", "3B", "HR", "RBI", "BB", "SO", "SB", "AVG", "OPS"]
+    else:
+        headers = ["Date", "Opp", "Dec", "IP", "H", "R", "ER", "BB", "SO", "HR", "P", "S", "ERA"]
+
+    # Title
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
+    title_cell = ws.cell(row=1, column=1, value=f"{player_name} — {season} {'Batting' if group == 'hitting' else 'Pitching'} Game Log")
+    title_cell.font = title_font
+    title_cell.fill = title_fill
+    title_cell.alignment = Alignment(horizontal="center")
+
+    # Headers
+    for col_idx, h in enumerate(headers, 1):
+        cell = ws.cell(row=2, column=col_idx, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+
+    # Data rows
+    for row_idx, g in enumerate(games, 3):
+        prefix = "vs " if g.get("home") else "@ "
+        opp = prefix + g.get("opponent", "")
+
+        if group == "hitting":
+            row_data = [
+                g.get("date", ""), opp,
+                g.get("ab", 0), g.get("r", 0), g.get("h", 0),
+                g.get("doubles", 0), g.get("triples", 0), g.get("hr", 0),
+                g.get("rbi", 0), g.get("bb", 0), g.get("so", 0),
+                g.get("sb", 0), g.get("avg", ""), g.get("ops", ""),
+            ]
+        else:
+            row_data = [
+                g.get("date", ""), opp, g.get("decision", ""),
+                g.get("ip", ""), g.get("h", 0), g.get("r", 0),
+                g.get("er", 0), g.get("bb", 0), g.get("so", 0),
+                g.get("hr", 0), g.get("pitches", 0), g.get("strikes", 0),
+                g.get("era", ""),
+            ]
+
+        for col_idx, val in enumerate(row_data, 1):
+            cell = ws.cell(row=row_idx, column=col_idx, value=val)
+            cell.border = thin_border
+            if col_idx > 2:
+                cell.alignment = Alignment(horizontal="center")
+
+    # Auto-width columns
+    for col_idx in range(1, len(headers) + 1):
+        max_len = len(str(headers[col_idx - 1]))
+        for row in ws.iter_rows(min_row=3, min_col=col_idx, max_col=col_idx):
+            for cell in row:
+                if cell.value is not None:
+                    max_len = max(max_len, len(str(cell.value)))
+        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = max_len + 3
+
+    # Write to buffer
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    safe_name = re.sub(r"[^a-zA-Z0-9_\- ]", "", player_name).strip().replace(" ", "_")
+    filename = f"{safe_name}_{season}_{'batting' if group == 'hitting' else 'pitching'}_game_log.xlsx"
+
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 if __name__ == "__main__":
