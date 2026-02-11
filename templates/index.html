@@ -406,19 +406,21 @@
             white-space: nowrap;
         }
 
-        .hit-type-url {
-            max-width: 500px;
-            word-break: break-all;
-        }
-
-        .hit-type-url a {
+        .btn-view-url {
+            display: inline-block;
+            padding: 4px 10px;
+            background: transparent;
+            border: 1px solid #7AD4F0;
             color: #7AD4F0;
-            text-decoration: underline;
+            border-radius: 4px;
             font-size: 12px;
+            text-decoration: none;
+            transition: background 0.2s, color 0.2s;
         }
 
-        .hit-type-url a:hover {
-            color: #9AE0F8;
+        .btn-view-url:hover {
+            background: #7AD4F0;
+            color: #0D1B2A;
         }
 
         .btn-use-url {
@@ -988,13 +990,13 @@
 
             <h4 class="url-section-header">Batting Video Savant Clips</h4>
             <div class="video-table-wrap"><table class="video-table">
-                <thead><tr><th>Hit Type</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
+                <thead><tr><th>Hit Type</th><th style="width: 60px; text-align: center;">Link</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
                 <tbody id="hitTypeBody"></tbody>
             </table></div>
 
             <h4 class="url-section-header" style="margin-top: 16px;">Pitching Video Savant Clips</h4>
             <div class="video-table-wrap"><table class="video-table">
-                <thead><tr><th>Category</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
+                <thead><tr><th>Category</th><th style="width: 60px; text-align: center;">Link</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
                 <tbody id="pitchTypeBody"></tbody>
             </table></div>
         </div>
@@ -1162,6 +1164,9 @@ const BATTING_TYPES = [
     {label: 'Doubles', params: 'double%7C'},
     {label: 'Triples', params: 'triple%7C'},
     {label: 'Home Runs', params: 'home_run%7C'},
+    {label: 'RBI', params: 'single%7Cdouble%7Ctriple%7Chome_run%7Csac_fly%7C'},
+    {label: 'Strikeouts', params: 'strikeout%7C'},
+    {label: 'Groundouts', params: 'grounded_into_double_play%7Cfield_out%7Cforce_out%7C&hfBBT=ground_ball%7C'},
 ];
 const PITCHING_TYPES = [
     {label: 'Strikeouts', params: 'hfAB=strikeout%7C'},
@@ -1815,10 +1820,9 @@ function updateSavantUrls() {
         let html = '';
         for (const t of types) {
             const url = buildSavantUrl(player.mlb_id, playerType, t.params, checkedYears, gameTypes);
-            const truncated = url.length > 70 ? url.substring(0, 70) + '...' : url;
             html += '<tr class="hit-type-row">';
             html += '<td class="hit-type-label">' + esc(t.label) + '</td>';
-            html += '<td class="hit-type-url"><a href="' + esc(url) + '" target="_blank">' + esc(truncated) + '</a></td>';
+            html += '<td style="text-align: center;"><a href="' + esc(url) + '" target="_blank" class="btn-view-url" title="Open in Savant">View</a></td>';
             html += '<td style="text-align: center;"><button class="btn-use-url" onclick="useUrl(this)" data-url="' + esc(url) + '">Use This URL</button></td>';
             html += '</tr>';
         }
