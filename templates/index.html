@@ -135,6 +135,9 @@
 
         .btn-download:hover:not(:disabled) { background: #22944a; }
 
+        .btn-combine { background: #8a5c00; color: #fff; }
+        .btn-combine:hover:not(:disabled) { background: #a87000; }
+
         .btn-select {
             background: #2a3a4a;
             color: #ccc;
@@ -395,6 +398,9 @@
                 <button class="btn btn-download" id="downloadBtn" onclick="doDownload()">
                     Download Selected
                 </button>
+                <button class="btn btn-download" id="combineBtn" onclick="doCombine()" style="background:#8a5c00;display:none;">
+                    Combine into One Video
+                </button>
             </div>
         </div>
         <div class="video-table-wrap">
@@ -424,6 +430,7 @@
 
 <script>
 let videoData = [];
+let downloadedFilenames = [];
 
 function showStatus(msg, type) {
     const el = document.getElementById('statusMsg');
@@ -643,6 +650,16 @@ function trackProgress(jobId, selected) {
             progCurrent.textContent = 'Complete!';
             document.getElementById('downloadBtn').disabled = false;
 
+            // Collect successfully downloaded filenames
+            downloadedFilenames = job.results
+                .filter(r => r.status === 'ok')
+                .map(r => r.filename);
+
+            // Show combine button if we have 2+ downloaded videos
+            if (downloadedFilenames.length >= 2) {
+                document.getElementById('combineBtn').style.display = '';
+            }
+
             const msg = `Download complete: ${job.completed} downloaded, ${job.failed} failed.`;
             showStatus(msg, job.failed > 0 ? 'info' : 'success');
         }
@@ -667,6 +684,81 @@ async function pollProgress(jobId) {
         }
     } catch (e) {
         // stop polling
+    }
+}
+
+async function doCombine() {
+    if (downloadedFilenames.length < 2) {
+        showStatus('Need at least 2 downloaded videos to combine.', 'error');
+        return;
+    }
+
+    const btn = document.getElementById('combineBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>Combining...';
+
+    const progSection = document.getElementById('progressSection');
+    const progBar = document.getElementById('progressBar');
+    const progCurrent = document.getElementById('progressCurrent');
+    const progCount = document.getElementById('progressCount');
+    const progPct = document.getElementById('progressPct');
+
+    progSection.classList.add('show');
+    progCurrent.innerHTML = '<span class="spinner"></span>Combining all videos into one...';
+    progBar.style.width = '50%';
+    progCount.textContent = `${downloadedFilenames.length} videos`;
+    progPct.textContent = '...';
+
+    try {
+        const resp = await fetch('/api/combine', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                filenames: downloadedFilenames,
+                output_name: 'combined_video.mp4',
+            }),
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            showStatus(data.error || 'Combine failed.', 'error');
+            btn.disabled = false;
+            btn.textContent = 'Combine into One Video';
+            return;
+        }
+
+        // Poll for completion
+        const jobId = data.job_id;
+        const poll = async () => {
+            const statusResp = await fetch('/api/status/' + jobId);
+            const job = await statusResp.json();
+
+            if (job.status === 'done') {
+                progBar.style.width = '100%';
+                progPct.textContent = '100%';
+
+                const result = job.results[0];
+                if (result && result.status === 'ok') {
+                    progCurrent.textContent = 'Combined video ready!';
+                    showStatus('All videos combined into combined_video.mp4 in your Downloads folder!', 'success');
+                } else {
+                    const errMsg = (result && result.error) || 'Unknown error';
+                    progCurrent.textContent = 'Combine failed.';
+                    showStatus('Combine failed: ' + errMsg, 'error');
+                }
+
+                btn.disabled = false;
+                btn.textContent = 'Combine into One Video';
+            } else {
+                setTimeout(poll, 1000);
+            }
+        };
+        poll();
+
+    } catch (err) {
+        showStatus('Network error: ' + err.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Combine into One Video';
     }
 }
 

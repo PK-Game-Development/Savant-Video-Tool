@@ -12,6 +12,9 @@ import io
 import json
 import os
 import re
+import shutil
+import subprocess
+import tempfile
 import threading
 import time
 import uuid
@@ -292,6 +295,85 @@ def api_progress(job_id):
             time.sleep(0.5)
 
     return Response(generate(), mimetype="text/event-stream")
+
+
+def combine_videos(file_paths, output_path):
+    """Combine multiple mp4 files into one using ffmpeg's concat demuxer."""
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg is not installed. Install it with: brew install ffmpeg")
+
+    # Create a temporary file list for ffmpeg
+    tmp_fd, tmp_list = tempfile.mkstemp(suffix=".txt")
+    try:
+        with os.fdopen(tmp_fd, "w") as f:
+            for path in file_paths:
+                # ffmpeg concat demuxer needs escaped single quotes in paths
+                escaped = path.replace("'", "'\\''")
+                f.write(f"file '{escaped}'\n")
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", tmp_list,
+            "-c", "copy",
+            output_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg failed: {result.stderr}")
+    finally:
+        os.unlink(tmp_list)
+
+    return os.path.getsize(output_path)
+
+
+@app.route("/api/combine", methods=["POST"])
+def api_combine():
+    """Combine downloaded videos into a single video file."""
+    data = request.get_json()
+    filenames = data.get("filenames", [])
+    output_name = data.get("output_name", "combined_video.mp4")
+
+    if not filenames:
+        return jsonify({"error": "No filenames provided"}), 400
+
+    # Verify all files exist
+    file_paths = []
+    for fn in filenames:
+        path = os.path.join(DOWNLOAD_DIR, fn)
+        if not os.path.exists(path):
+            return jsonify({"error": f"File not found: {fn}"}), 404
+        file_paths.append(path)
+
+    output_path = os.path.join(DOWNLOAD_DIR, output_name)
+
+    job_id = str(uuid.uuid4())[:8]
+    jobs[job_id] = {
+        "status": "running",
+        "total": len(file_paths),
+        "completed": 0,
+        "failed": 0,
+        "current": "Combining videos...",
+        "results": [],
+    }
+
+    def run_combine():
+        job = jobs[job_id]
+        try:
+            combine_videos(file_paths, output_path)
+            job["completed"] = len(file_paths)
+            job["results"].append({"filename": output_name, "status": "ok"})
+        except Exception as e:
+            job["failed"] = 1
+            job["results"].append({"filename": output_name, "status": "failed", "error": str(e)})
+        job["status"] = "done"
+        job["current"] = ""
+
+    thread = threading.Thread(target=run_combine, daemon=True)
+    thread.start()
+
+    return jsonify({"job_id": job_id, "output_name": output_name})
 
 
 @app.route("/videos/<filename>")
