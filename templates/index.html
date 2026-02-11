@@ -116,6 +116,82 @@
             color: #4A5A7A;
         }
 
+        /* Autocomplete */
+        .search-input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+
+        .search-input-wrapper input[type="text"] {
+            width: 100%;
+            flex: none;
+        }
+
+        .suggestions-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #0B1026;
+            border: 2px solid #F5C842;
+            border-top: 1px solid #1A2844;
+            border-radius: 0 0 8px 8px;
+            max-height: 340px;
+            overflow-y: auto;
+            z-index: 100;
+            display: none;
+        }
+
+        .suggestions-dropdown.show {
+            display: block;
+        }
+
+        .suggestion-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 14px;
+            cursor: pointer;
+            gap: 12px;
+            border-bottom: 1px solid #1A2844;
+            transition: background 0.1s;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover,
+        .suggestion-item.active {
+            background: #1A2844;
+        }
+
+        .suggestion-item img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
+            background: #1A2844;
+            flex-shrink: 0;
+        }
+
+        .suggestion-name {
+            color: #fff;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .suggestion-meta {
+            color: #7888AA;
+            font-size: 12px;
+            margin-top: 1px;
+        }
+
+        .suggestion-inactive {
+            color: #E67A8A;
+            font-size: 11px;
+            font-style: italic;
+        }
+
         .options-row {
             display: flex;
             gap: 16px;
@@ -823,9 +899,12 @@
     <div class="player-search-section">
         <h3 style="color: #F5C842; margin: 0 0 16px 0; font-size: 24px; text-decoration: underline;">Player Search</h3>
         <div class="search-row">
-            <input type="text" id="playerName"
-                   placeholder="Search by player name (e.g., Aaron Judge)..."
-                   spellcheck="false">
+            <div class="search-input-wrapper">
+                <input type="text" id="playerName"
+                       placeholder="Search by player name (e.g., Aaron Judge)..."
+                       spellcheck="false" autocomplete="off">
+                <div id="playerSuggestions" class="suggestions-dropdown"></div>
+            </div>
             <button class="btn btn-search" id="playerSearchBtn" onclick="doPlayerSearch()">Search Player</button>
         </div>
         <div id="playerResults" style="display: none;"></div>
@@ -1375,8 +1454,132 @@ document.getElementById('searchUrl').addEventListener('keydown', function(e) {
 let playerSearchResults = [];
 let selectedPlayerIndex = 0;
 
-document.getElementById('playerName').addEventListener('keydown', function(e) {
+// --- Autocomplete ---
+let suggestTimer = null;
+let suggestResults = [];
+let suggestIndex = -1;
+let suggestAbort = null;
+
+const playerInput = document.getElementById('playerName');
+const suggestDropdown = document.getElementById('playerSuggestions');
+
+playerInput.addEventListener('input', function() {
+    clearTimeout(suggestTimer);
+    if (suggestAbort) { suggestAbort.abort(); suggestAbort = null; }
+    const val = this.value.trim();
+    if (val.length < 2) { hideSuggestions(); return; }
+    suggestTimer = setTimeout(() => fetchSuggestions(val), 280);
+});
+
+async function fetchSuggestions(query) {
+    if (suggestAbort) suggestAbort.abort();
+    suggestAbort = new AbortController();
+    try {
+        const resp = await fetch('/api/player-search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: query}),
+            signal: suggestAbort.signal,
+        });
+        if (!resp.ok) { hideSuggestions(); return; }
+        const data = await resp.json();
+        suggestResults = data.players || [];
+        if (suggestResults.length === 0) { hideSuggestions(); return; }
+        suggestIndex = -1;
+        renderSuggestions();
+    } catch (e) {
+        if (e.name !== 'AbortError') hideSuggestions();
+    }
+}
+
+function renderSuggestions() {
+    let html = '';
+    suggestResults.forEach((p, i) => {
+        const parts = [];
+        if (p.position) parts.push(p.position);
+        if (p.team) parts.push(p.team);
+        const meta = parts.join(' \u00b7 ');
+        const cls = 'suggestion-item' + (i === suggestIndex ? ' active' : '');
+        html += '<div class="' + cls + '" data-index="' + i + '">';
+        if (p.headshot_url) {
+            html += '<img src="' + esc(p.headshot_url) + '" alt="" onerror="this.style.visibility=\'hidden\'">';
+        }
+        html += '<div>';
+        html += '<div class="suggestion-name">' + esc(p.name) + '</div>';
+        if (meta) html += '<div class="suggestion-meta">' + esc(meta) + '</div>';
+        if (!p.active) html += '<div class="suggestion-inactive">Inactive</div>';
+        html += '</div></div>';
+    });
+    suggestDropdown.innerHTML = html;
+    suggestDropdown.classList.add('show');
+
+    suggestDropdown.querySelectorAll('.suggestion-item').forEach(el => {
+        el.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            selectSuggestion(parseInt(this.dataset.index));
+        });
+    });
+
+    // Scroll active item into view
+    if (suggestIndex >= 0) {
+        const activeEl = suggestDropdown.querySelector('.suggestion-item.active');
+        if (activeEl) activeEl.scrollIntoView({block: 'nearest'});
+    }
+}
+
+function hideSuggestions() {
+    suggestResults = [];
+    suggestIndex = -1;
+    suggestDropdown.classList.remove('show');
+}
+
+function selectSuggestion(index) {
+    const player = suggestResults[index];
+    if (!player) return;
+    playerInput.value = player.name;
+    hideSuggestions();
+
+    // Use the suggest data directly — no second API call
+    playerSearchResults = suggestResults;
+    selectedPlayerIndex = index;
+    renderPlayerResults();
+    document.getElementById('playerResults').style.display = 'block';
+    showStatus('Found player: ' + player.name, 'success');
+}
+
+// Keyboard: arrows, enter, escape
+playerInput.addEventListener('keydown', function(e) {
+    if (suggestDropdown.classList.contains('show')) {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            suggestIndex = Math.min(suggestIndex + 1, suggestResults.length - 1);
+            renderSuggestions();
+            return;
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            suggestIndex = Math.max(suggestIndex - 1, -1);
+            renderSuggestions();
+            return;
+        } else if (e.key === 'Enter' && suggestIndex >= 0) {
+            e.preventDefault();
+            selectSuggestion(suggestIndex);
+            return;
+        } else if (e.key === 'Escape') {
+            hideSuggestions();
+            return;
+        }
+    }
     if (e.key === 'Enter') doPlayerSearch();
+});
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.search-input-wrapper')) hideSuggestions();
+});
+
+// Hide suggestions on blur (with delay for click to register)
+playerInput.addEventListener('blur', function() {
+    setTimeout(hideSuggestions, 200);
 });
 
 async function doPlayerSearch() {
