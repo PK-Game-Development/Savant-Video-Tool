@@ -16,7 +16,7 @@
 
         .header {
             background: linear-gradient(135deg, #111A33, #0B1026);
-            border-bottom: 3px solid #DDED37;
+            border-bottom: 3px solid #F5C842;
             padding: 20px 0;
             text-align: center;
         }
@@ -27,7 +27,7 @@
             letter-spacing: 1px;
         }
 
-        .header h1 span { color: #DDED37; }
+        .header h1 span { color: #F5C842; }
 
         .header p {
             color: #7888AA;
@@ -41,7 +41,7 @@
             left: 16px;
             font-size: 24px;
             line-height: 1.6;
-            color: #DDED37;
+            color: #F5C842;
             text-align: left;
             z-index: 1000;
         }
@@ -54,12 +54,12 @@
         }
 
         .footer-credit a {
-            color: #DDED37;
-            text-decoration: none;
+            color: #7AD4F0;
+            text-decoration: underline;
         }
 
         .footer-credit a:hover {
-            text-decoration: underline;
+            color: #9AE0F8;
         }
 
         .container {
@@ -95,7 +95,7 @@
         }
 
         .search-row input[type="text"]:focus {
-            border-color: #DDED37;
+            border-color: #F5C842;
         }
 
         .search-row input[type="text"]::placeholder {
@@ -149,18 +149,18 @@
         }
 
         .btn-search {
-            background: #DDED37;
+            background: #F5C842;
             color: #0B1026;
         }
 
-        .btn-search:hover:not(:disabled) { background: #E8F54A; }
+        .btn-search:hover:not(:disabled) { background: #F7D35A; }
 
         .btn-download {
-            background: #DDED37;
+            background: #F5C842;
             color: #0B1026;
         }
 
-        .btn-download:hover:not(:disabled) { background: #E8F54A; }
+        .btn-download:hover:not(:disabled) { background: #F7D35A; }
 
         .btn-save {
             background: #5EC4E6;
@@ -179,7 +179,7 @@
             gap: 6px;
             cursor: pointer;
             font-size: 13px;
-            color: #DDED37;
+            color: #F5C842;
             background: #1A2844;
             border: 1px solid #2A3855;
             border-radius: 6px;
@@ -188,10 +188,10 @@
             transition: border-color 0.2s;
         }
 
-        .combine-option:hover { border-color: #DDED37; }
+        .combine-option:hover { border-color: #F5C842; }
 
         .combine-option input[type="checkbox"] {
-            accent-color: #DDED37;
+            accent-color: #F5C842;
         }
 
         .btn-select {
@@ -215,7 +215,7 @@
         .status.show { display: block; }
         .status.info { background: #0E1A30; border: 1px solid #1A2844; color: #5EC4E6; }
         .status.error { background: #1A0E1A; border: 1px solid #3A1A2A; color: #E67A8A; }
-        .status.success { background: #1A2A10; border: 1px solid #2A3A1A; color: #DDED37; }
+        .status.success { background: #1A2A10; border: 1px solid #2A3A1A; color: #F5C842; }
 
         /* Results Section */
         .results-section {
@@ -235,7 +235,7 @@
 
         .results-header h2 {
             font-size: 18px;
-            color: #DDED37;
+            color: #F5C842;
         }
 
         .results-header .stats {
@@ -282,7 +282,7 @@
 
         .video-table tr:hover { background: #152038; }
 
-        .video-table .player { font-weight: 600; color: #DDED37; }
+        .video-table .player { font-weight: 600; color: #F5C842; }
         .video-table .event { color: #5EC4E6; }
         .video-table .date { color: #7888AA; }
         .video-table .stat { color: #aaa; font-variant-numeric: tabular-nums; }
@@ -302,16 +302,16 @@
 
         .badge-ready { background: #1A2844; color: #7888AA; }
         .badge-downloading { background: #0E1A30; color: #5EC4E6; }
-        .badge-done { background: #1A2A10; color: #DDED37; }
+        .badge-done { background: #1A2A10; color: #F5C842; }
         .badge-failed { background: #1A0E1A; color: #E67A8A; }
-        .badge-skipped { background: #1A1A0E; color: #DDED37; }
+        .badge-skipped { background: #1A1A0E; color: #F5C842; }
 
         .checkbox-cell { width: 40px; text-align: center; }
 
         input[type="checkbox"] {
             width: 16px;
             height: 16px;
-            accent-color: #DDED37;
+            accent-color: #F5C842;
             cursor: pointer;
         }
 
@@ -335,7 +335,7 @@
         }
 
         .progress-bar {
-            background: linear-gradient(90deg, #DDED37, #E8F54A);
+            background: linear-gradient(90deg, #F5C842, #F7D35A);
             height: 100%;
             width: 0%;
             transition: width 0.3s ease;
@@ -362,12 +362,12 @@
 
         /* Preview Link */
         a.preview-link {
-            color: #5EC4E6;
-            text-decoration: none;
+            color: #7AD4F0;
+            text-decoration: underline;
             font-size: 12px;
         }
 
-        a.preview-link:hover { text-decoration: underline; }
+        a.preview-link:hover { color: #9AE0F8; }
 
         /* Scrollable table */
         .table-scroll {
@@ -388,7 +388,7 @@
             width: 16px;
             height: 16px;
             border: 2px solid #2A3855;
-            border-top-color: #DDED37;
+            border-top-color: #F5C842;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             vertical-align: middle;
@@ -692,7 +692,7 @@ function trackProgress(jobId) {
             }
         } else if (phase === 'combining') {
             progBar.style.width = '100%';
-            progBar.style.background = 'linear-gradient(90deg, #DDED37, #E8F54A)';
+            progBar.style.background = 'linear-gradient(90deg, #F5C842, #F7D35A)';
             progCurrent.innerHTML = '<span class="spinner"></span>Combining all clips into one video...';
             progCount.textContent = `${done} clips`;
             progPct.textContent = '...';
