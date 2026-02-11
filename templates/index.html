@@ -286,7 +286,8 @@
             gap: 4px;
         }
 
-        .combine-option input[type="checkbox"] {
+        .combine-option input[type="checkbox"],
+        .combine-option input[type="radio"] {
             accent-color: #F5C842;
         }
 
@@ -393,51 +394,6 @@
             font-size: 24px;
             font-weight: 700;
             text-decoration: underline;
-        }
-
-        .hit-type-row td {
-            padding: 10px 12px;
-            font-size: 13px;
-        }
-
-        .hit-type-label {
-            color: #F5C842;
-            font-weight: 600;
-            white-space: nowrap;
-        }
-
-        .btn-view-url {
-            display: inline-block;
-            padding: 4px 10px;
-            background: transparent;
-            border: 1px solid #7AD4F0;
-            color: #7AD4F0;
-            border-radius: 4px;
-            font-size: 12px;
-            text-decoration: none;
-            transition: background 0.2s, color 0.2s;
-        }
-
-        .btn-view-url:hover {
-            background: #7AD4F0;
-            color: #0D1B2A;
-        }
-
-        .btn-use-url {
-            padding: 6px 14px;
-            border: none;
-            border-radius: 4px;
-            background: #5EC4E6;
-            color: #0B1026;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            white-space: nowrap;
-        }
-
-        .btn-use-url:hover {
-            background: #7AD0EC;
         }
 
         /* Status Messages */
@@ -978,30 +934,45 @@
 
             <h4 style="color: #F5C842; margin: 0 0 12px 0; font-size: 16px;">Game Type</h4>
             <div id="gameTypeCheckboxes" style="display: flex; flex-wrap: nowrap; gap: 6px; margin-bottom: 16px;">
-                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="R" checked onchange="updateSavantUrls()"><span>Regular</span></label>
-                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="PO" onchange="updateSavantUrls()"><span>Postseason</span></label>
-                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="WC" onchange="updateSavantUrls()"><span>Wildcard</span></label>
-                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="DI" onchange="updateSavantUrls()"><span>Division</span></label>
-                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="LC" onchange="updateSavantUrls()"><span>LCS</span></label>
-                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="WS" onchange="updateSavantUrls()"><span>World Series</span></label>
-                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="ST" onchange="updateSavantUrls()"><span>Spring</span></label>
-                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="AS" onchange="updateSavantUrls()"><span>All Star</span></label>
+                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="R" checked onchange="updateBuiltUrl()"><span>Regular</span></label>
+                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="PO" onchange="updateBuiltUrl()"><span>Postseason</span></label>
+                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="WC" onchange="updateBuiltUrl()"><span>Wildcard</span></label>
+                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="DI" onchange="updateBuiltUrl()"><span>Division</span></label>
+                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="LC" onchange="updateBuiltUrl()"><span>LCS</span></label>
+                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="WS" onchange="updateBuiltUrl()"><span>World Series</span></label>
+                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="ST" onchange="updateBuiltUrl()"><span>Spring</span></label>
+                <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="AS" onchange="updateBuiltUrl()"><span>All Star</span></label>
             </div>
 
-            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 280px;">
-                    <h4 class="url-section-header">Batting Video Savant Clips</h4>
-                    <div class="video-table-wrap"><table class="video-table">
-                        <thead><tr><th>Hit Type</th><th style="width: 60px; text-align: center;">Link</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
-                        <tbody id="hitTypeBody"></tbody>
-                    </table></div>
+            <h4 style="color: #F5C842; margin: 0 0 12px 0; font-size: 16px;">Player Type</h4>
+            <div style="display: flex; gap: 6px; margin-bottom: 16px;">
+                <label class="combine-option compact"><input type="radio" name="urlPlayerType" value="batter" checked onchange="togglePlayerType()"><span>Batting</span></label>
+                <label class="combine-option compact"><input type="radio" name="urlPlayerType" value="pitcher" onchange="togglePlayerType()"><span>Pitching</span></label>
+            </div>
+
+            <div id="battingOptions">
+                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">Select Categories</h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="0" onchange="updateBuiltUrl()"><span>Singles</span></label>
+                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="1" onchange="updateBuiltUrl()"><span>Doubles</span></label>
+                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="2" onchange="updateBuiltUrl()"><span>Triples</span></label>
+                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="3" onchange="updateBuiltUrl()"><span>Home Runs</span></label>
+                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="4" onchange="updateBuiltUrl()"><span>RBI</span></label>
+                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="5" onchange="updateBuiltUrl()"><span>Strikeouts</span></label>
+                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="6" onchange="updateBuiltUrl()"><span>Groundouts</span></label>
                 </div>
-                <div style="flex: 1; min-width: 280px;">
-                    <h4 class="url-section-header">Pitching Video Savant Clips</h4>
-                    <div class="video-table-wrap"><table class="video-table">
-                        <thead><tr><th>Category</th><th style="width: 60px; text-align: center;">Link</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
-                        <tbody id="pitchTypeBody"></tbody>
-                    </table></div>
+            </div>
+
+            <div id="pitchingOptions" style="display: none;">
+                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">Select Category</h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="0" onchange="updateBuiltUrl()"><span>Strikeouts</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="1" onchange="updateBuiltUrl()"><span>K End of Inning</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="2" onchange="updateBuiltUrl()"><span>100+ MPH</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="3" onchange="updateBuiltUrl()"><span>12"+ VBreak</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="4" onchange="updateBuiltUrl()"><span>12"+ HBreak</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="5" onchange="updateBuiltUrl()"><span>HRs Allowed</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="6" onchange="updateBuiltUrl()"><span>RBIs Allowed</span></label>
                 </div>
             </div>
         </div>
@@ -1121,7 +1092,7 @@
         <ol>
             <li>Search for a player by name above, or paste a Baseball Savant Statcast Search URL directly into the search bar.</li>
             <li>Select the seasons and game types you want.</li>
-            <li>Click a <span class="key">Use This URL</span> button next to any hit type or pitch category to load it into the search bar.</li>
+            <li>Choose <span class="key">Batting</span> or <span class="key">Pitching</span>, then check the categories you want. The search URL builds automatically.</li>
             <li>Hit <span class="key">Search</span> to fetch the matching video clips.</li>
             <li>Check the clips you want, then click <span class="key">Download Selected</span>.</li>
         </ol>
@@ -1132,13 +1103,13 @@
         <h4>Seasons &amp; Game Types</h4>
         <p>After finding a player, select one or more seasons (2015 &ndash; present). Then choose which game types to include &mdash; Regular Season is checked by default. You can also add Postseason, Wildcard, Division Series, League Championship, World Series, Spring Training, or All-Star games.</p>
 
-        <h4>Savant URL Tables</h4>
-        <p>Two tables appear for every player:</p>
+        <h4>Category Builder</h4>
+        <p>After selecting seasons &amp; game types, pick <strong>Batting</strong> or <strong>Pitching</strong>:</p>
         <ul>
-            <li><strong>Batting</strong> &mdash; Singles, Doubles, Triples, Home Runs</li>
-            <li><strong>Pitching</strong> &mdash; Strikeouts, K End of Inning, 100+ MPH, high-break pitches, HRs allowed, RBIs allowed</li>
+            <li><strong>Batting</strong> &mdash; Check one or more categories (Singles, Doubles, Triples, Home Runs, RBI, Strikeouts, Groundouts). They combine into a single search URL.</li>
+            <li><strong>Pitching</strong> &mdash; Pick one category (Strikeouts, K End of Inning, 100+ MPH, high-break pitches, HRs Allowed, RBIs Allowed).</li>
         </ul>
-        <p>Each row has a pre-built Savant URL. Click the link to view results on Savant, or click <span class="key">Use This URL</span> to load it here for downloading.</p>
+        <p>The Savant search URL updates automatically in the search bar as you change options.</p>
 
         <h4>Download Options</h4>
         <ul>
@@ -1167,38 +1138,31 @@ let videoData = [];
 let currentPlayerType = 'batter';
 let currentJobId = null;
 
-const BATTING_TYPES = [
-    {label: 'Singles', params: 'single%7C'},
-    {label: 'Doubles', params: 'double%7C'},
-    {label: 'Triples', params: 'triple%7C'},
-    {label: 'Home Runs', params: 'home_run%7C'},
-    {label: 'RBI', params: 'single%7Cdouble%7Ctriple%7Chome_run%7Csac_fly%7C'},
-    {label: 'Strikeouts', params: 'strikeout%7C'},
-    {label: 'Groundouts', params: 'grounded_into_double_play%7Cfield_out%7Cforce_out%7C&hfBBT=ground_ball%7C'},
+const BATTING_OPTIONS = [
+    {label: 'Singles', events: ['single']},
+    {label: 'Doubles', events: ['double']},
+    {label: 'Triples', events: ['triple']},
+    {label: 'Home Runs', events: ['home_run']},
+    {label: 'RBI', events: ['single', 'double', 'triple', 'home_run', 'sac_fly']},
+    {label: 'Strikeouts', events: ['strikeout']},
+    {label: 'Groundouts', events: ['grounded_into_double_play', 'field_out', 'force_out'], extra: '&hfBBT=ground_ball%7C'},
 ];
-const PITCHING_TYPES = [
+const PITCHING_OPTIONS = [
     {label: 'Strikeouts', params: 'hfAB=strikeout%7C'},
     {label: 'K End of Inning', params: 'hfAB=strikeout%7C&hfOuts=2%7C'},
     {label: '100+ MPH', params: 'metric_1=api_p_release_speed&metric_1_gt=100'},
-    {label: '12"+ Vertical Break', params: 'metric_1=api_p_induced_break_z&metric_1_gt=12'},
-    {label: '12"+ Horizontal Break', params: 'metric_1=api_p_break_x_arm&metric_1_gt=12'},
-    {label: 'Home Runs Allowed', params: 'hfAB=home_run%7C'},
+    {label: '12"+ VBreak', params: 'metric_1=api_p_induced_break_z&metric_1_gt=12'},
+    {label: '12"+ HBreak', params: 'metric_1=api_p_break_x_arm&metric_1_gt=12'},
+    {label: 'HRs Allowed', params: 'hfAB=home_run%7C'},
     {label: 'RBIs Allowed', params: 'hfAB=single%7Cdouble%7Ctriple%7Chome_run%7Csac_fly%7C'},
 ];
 const SEASON_START = 2015;
 
-function buildSavantUrl(mlbId, playerType, extraParams, checkedYears, gameTypes) {
-    if (checkedYears.length === 0) return '';
-    const seasonsStr = checkedYears.join('%7C') + '%7C';
-    const gtStr = gameTypes.join('%7C') + '%7C';
-    const base = 'https://baseballsavant.mlb.com/statcast_search';
-    if (playerType === 'batter') {
-        return base + '?hfAB=' + extraParams + '&hfSea=' + seasonsStr
-            + '&player_type=batter&batters_lookup%5B%5D=' + mlbId + '&hfGT=' + gtStr;
-    } else {
-        return base + '?player_type=pitcher&pitchers_lookup%5B%5D=' + mlbId
-            + '&hfGT=' + gtStr + '&hfSea=' + seasonsStr + '&' + extraParams;
-    }
+function togglePlayerType() {
+    const type = document.querySelector('input[name="urlPlayerType"]:checked').value;
+    document.getElementById('battingOptions').style.display = type === 'batter' ? '' : 'none';
+    document.getElementById('pitchingOptions').style.display = type === 'pitcher' ? '' : 'none';
+    updateBuiltUrl();
 }
 
 function showStatus(msg, type) {
@@ -1804,7 +1768,7 @@ function renderPlayerDetail(index) {
     // Show and populate the season/URL builder in the search section
     populateSeasonCheckboxes();
     document.getElementById('savantUrlBuilder').style.display = 'block';
-    updateSavantUrls();
+    updateBuiltUrl();
 
     // Show game log section and populate its season dropdown
     showGameLogSection(player);
@@ -1818,62 +1782,55 @@ function populateSeasonCheckboxes() {
         const checked = (year === currentYear) ? ' checked' : '';
         html += '<label class="combine-option compact">'
             + '<input type="checkbox" class="season-year-cb" value="' + year + '"'
-            + checked + ' onchange="updateSavantUrls()">'
+            + checked + ' onchange="updateBuiltUrl()">'
             + '<span>' + year + '</span></label>';
     }
     container.innerHTML = html;
 }
 
-function updateSavantUrls() {
+function updateBuiltUrl() {
     const player = playerSearchResults[selectedPlayerIndex];
     if (!player) return;
 
-    const hitBody = document.getElementById('hitTypeBody');
-    const pitchBody = document.getElementById('pitchTypeBody');
-    if (!hitBody || !pitchBody) return;
-
-    // Gather checked years
-    const checkedYears = [];
-    document.querySelectorAll('.season-year-cb:checked').forEach(cb => {
-        checkedYears.push(cb.value);
-    });
-
-    // Gather checked game types
-    const gameTypes = [];
-    document.querySelectorAll('.game-type-cb:checked').forEach(cb => {
-        gameTypes.push(cb.value);
-    });
+    const checkedYears = [...document.querySelectorAll('.season-year-cb:checked')].map(cb => cb.value);
+    const gameTypes = [...document.querySelectorAll('.game-type-cb:checked')].map(cb => cb.value);
+    const searchInput = document.getElementById('searchUrl');
 
     if (checkedYears.length === 0 || gameTypes.length === 0) {
-        const msg = checkedYears.length === 0 ? 'Select at least one season above' : 'Select at least one game type above';
-        hitBody.innerHTML = '<tr><td colspan="3" style="color: #7888AA; text-align: center; padding: 16px;">' + msg + '</td></tr>';
-        pitchBody.innerHTML = '<tr><td colspan="3" style="color: #7888AA; text-align: center; padding: 16px;">' + msg + '</td></tr>';
+        searchInput.value = '';
         return;
     }
 
-    function buildRows(types, playerType) {
-        let html = '';
-        for (const t of types) {
-            const url = buildSavantUrl(player.mlb_id, playerType, t.params, checkedYears, gameTypes);
-            html += '<tr class="hit-type-row">';
-            html += '<td class="hit-type-label">' + esc(t.label) + '</td>';
-            html += '<td style="text-align: center;"><a href="' + esc(url) + '" target="_blank" class="btn-view-url" title="Open in Savant">View</a></td>';
-            html += '<td style="text-align: center;"><button class="btn-use-url" onclick="useUrl(this)" data-url="' + esc(url) + '">Use This URL</button></td>';
-            html += '</tr>';
-        }
-        return html;
+    const seasonsStr = checkedYears.join('%7C') + '%7C';
+    const gtStr = gameTypes.join('%7C') + '%7C';
+    const playerType = document.querySelector('input[name="urlPlayerType"]:checked').value;
+    const base = 'https://baseballsavant.mlb.com/statcast_search';
+
+    if (playerType === 'batter') {
+        const checkedCats = [...document.querySelectorAll('.batting-cat-cb:checked')];
+        if (checkedCats.length === 0) { searchInput.value = ''; return; }
+
+        const allEvents = new Set();
+        let extraParams = '';
+        checkedCats.forEach(cb => {
+            const opt = BATTING_OPTIONS[parseInt(cb.value)];
+            opt.events.forEach(e => allEvents.add(e));
+            if (opt.extra) extraParams += opt.extra;
+        });
+
+        const eventsStr = [...allEvents].map(e => e + '%7C').join('');
+        searchInput.value = base + '?hfAB=' + eventsStr + extraParams
+            + '&hfSea=' + seasonsStr
+            + '&player_type=batter&batters_lookup%5B%5D=' + player.mlb_id
+            + '&hfGT=' + gtStr;
+    } else {
+        const checkedRadio = document.querySelector('.pitching-cat-rb:checked');
+        if (!checkedRadio) { searchInput.value = ''; return; }
+
+        const opt = PITCHING_OPTIONS[parseInt(checkedRadio.value)];
+        searchInput.value = base + '?player_type=pitcher&pitchers_lookup%5B%5D=' + player.mlb_id
+            + '&hfGT=' + gtStr + '&hfSea=' + seasonsStr + '&' + opt.params;
     }
-
-    hitBody.innerHTML = buildRows(BATTING_TYPES, 'batter');
-    pitchBody.innerHTML = buildRows(PITCHING_TYPES, 'pitcher');
-}
-
-function useUrl(btn) {
-    const url = btn.getAttribute('data-url');
-    const searchInput = document.getElementById('searchUrl');
-    searchInput.value = url;
-    searchInput.scrollIntoView({behavior: 'smooth', block: 'center'});
-    doSearch();
 }
 
 // --- Game Logs ---
