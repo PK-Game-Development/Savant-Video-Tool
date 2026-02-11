@@ -280,6 +280,12 @@
 
         .combine-option:hover { border-color: #F5C842; }
 
+        .combine-option.disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
         .combine-option.compact {
             padding: 5px 8px;
             font-size: 12px;
@@ -997,9 +1003,9 @@
             <div class="results-actions">
                 <button class="btn btn-select" onclick="selectAll()">Select All</button>
                 <button class="btn btn-select" onclick="selectNone()">Select None</button>
-                <label class="combine-option" title="Combine all clips into a single video file">
-                    <input type="checkbox" id="combineCheck">
-                    <span>Combine into one video</span>
+                <label class="combine-option disabled" title="Combine all clips into a single video file">
+                    <input type="checkbox" id="combineCheck" disabled>
+                    <span>Combine into one video — Coming Soon!</span>
                 </label>
                 <button class="btn btn-download" id="downloadBtn" onclick="doDownload()">
                     Download Selected
@@ -1827,6 +1833,12 @@ function populateSeasonCheckboxes() {
     const currentYear = new Date().getFullYear();
     let html = '';
     for (let year = currentYear; year >= SEASON_START; year--) {
+        if (year >= 2026) {
+            html += '<label class="combine-option compact disabled">'
+                + '<input type="checkbox" disabled>'
+                + '<span>' + year + ' — Coming Soon!</span></label>';
+            continue;
+        }
         const checked = (year === 2025) ? ' checked' : '';
         html += '<label class="combine-option compact">'
             + '<input type="checkbox" class="season-year-cb" value="' + year + '"'
