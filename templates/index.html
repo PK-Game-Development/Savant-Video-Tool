@@ -951,28 +951,19 @@
             </div>
 
             <div id="battingOptions">
-                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">Select Categories</h4>
-                <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="0" onchange="updateBuiltUrl()"><span>Singles</span></label>
-                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="1" onchange="updateBuiltUrl()"><span>Doubles</span></label>
-                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="2" onchange="updateBuiltUrl()"><span>Triples</span></label>
-                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="3" onchange="updateBuiltUrl()"><span>Home Runs</span></label>
-                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="4" onchange="updateBuiltUrl()"><span>RBI</span></label>
-                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="5" onchange="updateBuiltUrl()"><span>Strikeouts</span></label>
-                    <label class="combine-option compact"><input type="checkbox" class="batting-cat-cb" value="6" onchange="updateBuiltUrl()"><span>Groundouts</span></label>
-                </div>
+                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">PA Results</h4>
+                <div id="battingPaCheckboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
             </div>
 
             <div id="pitchingOptions" style="display: none;">
-                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">Select Category</h4>
+                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">PA Results</h4>
+                <div id="pitchingPaCheckboxes" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;"></div>
+                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">Pitch Metric Filter <span style="color: #7888AA; font-weight: 400; font-size: 12px;">(optional)</span></h4>
                 <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="0" onchange="updateBuiltUrl()"><span>Strikeouts</span></label>
-                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="1" onchange="updateBuiltUrl()"><span>K End of Inning</span></label>
-                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="2" onchange="updateBuiltUrl()"><span>100+ MPH</span></label>
-                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="3" onchange="updateBuiltUrl()"><span>12"+ VBreak</span></label>
-                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="4" onchange="updateBuiltUrl()"><span>12"+ HBreak</span></label>
-                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="5" onchange="updateBuiltUrl()"><span>HRs Allowed</span></label>
-                    <label class="combine-option compact"><input type="radio" name="pitchCat" class="pitching-cat-rb" value="6" onchange="updateBuiltUrl()"><span>RBIs Allowed</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchMetric" value="-1" checked onchange="updateBuiltUrl()"><span>None</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchMetric" value="0" onchange="updateBuiltUrl()"><span>100+ MPH</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchMetric" value="1" onchange="updateBuiltUrl()"><span>12"+ VBreak</span></label>
+                    <label class="combine-option compact"><input type="radio" name="pitchMetric" value="2" onchange="updateBuiltUrl()"><span>12"+ HBreak</span></label>
                 </div>
             </div>
         </div>
@@ -1106,8 +1097,8 @@
         <h4>Category Builder</h4>
         <p>After selecting seasons &amp; game types, pick <strong>Batting</strong> or <strong>Pitching</strong>:</p>
         <ul>
-            <li><strong>Batting</strong> &mdash; Check one or more categories (Singles, Doubles, Triples, Home Runs, RBI, Strikeouts, Groundouts). They combine into a single search URL.</li>
-            <li><strong>Pitching</strong> &mdash; Pick one category (Strikeouts, K End of Inning, 100+ MPH, high-break pitches, HRs Allowed, RBIs Allowed).</li>
+            <li><strong>PA Results</strong> &mdash; Check any combination of plate-appearance outcomes (Single, Double, Home Run, Strikeout, Walk, etc.). All selections combine into one URL.</li>
+            <li><strong>Pitch Metrics</strong> <em>(Pitching only)</em> &mdash; Optionally filter by 100+ MPH, 12"+ vertical break, or 12"+ horizontal break.</li>
         </ul>
         <p>The Savant search URL updates automatically in the search bar as you change options.</p>
 
@@ -1138,23 +1129,33 @@ let videoData = [];
 let currentPlayerType = 'batter';
 let currentJobId = null;
 
-const BATTING_OPTIONS = [
-    {label: 'Singles', events: ['single']},
-    {label: 'Doubles', events: ['double']},
-    {label: 'Triples', events: ['triple']},
-    {label: 'Home Runs', events: ['home_run']},
-    {label: 'RBI', events: ['single', 'double', 'triple', 'home_run', 'sac_fly']},
-    {label: 'Strikeouts', events: ['strikeout']},
-    {label: 'Groundouts', events: ['grounded_into_double_play', 'field_out', 'force_out'], extra: '&hfBBT=ground_ball%7C'},
+const PA_RESULTS = [
+    {label: 'Single', event: 'single'},
+    {label: 'Double', event: 'double'},
+    {label: 'Triple', event: 'triple'},
+    {label: 'Home Run', event: 'home_run'},
+    {label: 'Walk', event: 'walk'},
+    {label: 'Intent Walk', event: 'intent_walk'},
+    {label: 'Hit By Pitch', event: 'hit_by_pitch'},
+    {label: 'Sac Fly', event: 'sac_fly'},
+    {label: 'Sac Bunt', event: 'sac_bunt'},
+    {label: 'Strikeout', event: 'strikeout'},
+    {label: 'Strikeout DP', event: 'strikeout_double_play'},
+    {label: 'Field Out', event: 'field_out'},
+    {label: 'Force Out', event: 'force_out'},
+    {label: 'Grounded Into DP', event: 'grounded_into_double_play'},
+    {label: 'Double Play', event: 'double_play'},
+    {label: "Fielder's Choice", event: 'fielders_choice'},
+    {label: "FC Out", event: 'fielders_choice_out'},
+    {label: 'Field Error', event: 'field_error'},
+    {label: 'Catcher Interf', event: 'catcher_interf'},
+    {label: 'Sac Fly DP', event: 'sac_fly_double_play'},
+    {label: 'Triple Play', event: 'triple_play'},
 ];
-const PITCHING_OPTIONS = [
-    {label: 'Strikeouts', params: 'hfAB=strikeout%7C'},
-    {label: 'K End of Inning', params: 'hfAB=strikeout%7C&hfOuts=2%7C'},
+const PITCHING_METRICS = [
     {label: '100+ MPH', params: 'metric_1=api_p_release_speed&metric_1_gt=100'},
     {label: '12"+ VBreak', params: 'metric_1=api_p_induced_break_z&metric_1_gt=12'},
     {label: '12"+ HBreak', params: 'metric_1=api_p_break_x_arm&metric_1_gt=12'},
-    {label: 'HRs Allowed', params: 'hfAB=home_run%7C'},
-    {label: 'RBIs Allowed', params: 'hfAB=single%7Cdouble%7Ctriple%7Chome_run%7Csac_fly%7C'},
 ];
 const SEASON_START = 2015;
 
@@ -1164,6 +1165,25 @@ function togglePlayerType() {
     document.getElementById('pitchingOptions').style.display = type === 'pitcher' ? '' : 'none';
     updateBuiltUrl();
 }
+
+function populatePaCheckboxes() {
+    const battingContainer = document.getElementById('battingPaCheckboxes');
+    const pitchingContainer = document.getElementById('pitchingPaCheckboxes');
+    let bHtml = '';
+    let pHtml = '';
+    PA_RESULTS.forEach((pa, i) => {
+        bHtml += '<label class="combine-option compact">'
+            + '<input type="checkbox" class="batting-pa-cb" value="' + i + '" onchange="updateBuiltUrl()">'
+            + '<span>' + pa.label + '</span></label>';
+        pHtml += '<label class="combine-option compact">'
+            + '<input type="checkbox" class="pitching-pa-cb" value="' + i + '" onchange="updateBuiltUrl()">'
+            + '<span>' + pa.label + '</span></label>';
+    });
+    battingContainer.innerHTML = bHtml;
+    pitchingContainer.innerHTML = pHtml;
+}
+
+populatePaCheckboxes();
 
 function showStatus(msg, type) {
     const el = document.getElementById('statusMsg');
@@ -1807,29 +1827,35 @@ function updateBuiltUrl() {
     const base = 'https://baseballsavant.mlb.com/statcast_search';
 
     if (playerType === 'batter') {
-        const checkedCats = [...document.querySelectorAll('.batting-cat-cb:checked')];
-        if (checkedCats.length === 0) { searchInput.value = ''; return; }
+        const checkedPa = [...document.querySelectorAll('.batting-pa-cb:checked')];
+        if (checkedPa.length === 0) { searchInput.value = ''; return; }
 
-        const allEvents = new Set();
-        let extraParams = '';
-        checkedCats.forEach(cb => {
-            const opt = BATTING_OPTIONS[parseInt(cb.value)];
-            opt.events.forEach(e => allEvents.add(e));
-            if (opt.extra) extraParams += opt.extra;
-        });
-
-        const eventsStr = [...allEvents].map(e => e + '%7C').join('');
-        searchInput.value = base + '?hfAB=' + eventsStr + extraParams
+        const events = checkedPa.map(cb => PA_RESULTS[parseInt(cb.value)].event);
+        const eventsStr = events.map(e => e + '%7C').join('');
+        searchInput.value = base + '?hfAB=' + eventsStr
             + '&hfSea=' + seasonsStr
             + '&player_type=batter&batters_lookup%5B%5D=' + player.mlb_id
             + '&hfGT=' + gtStr;
     } else {
-        const checkedRadio = document.querySelector('.pitching-cat-rb:checked');
-        if (!checkedRadio) { searchInput.value = ''; return; }
+        const checkedPa = [...document.querySelectorAll('.pitching-pa-cb:checked')];
+        const metricRadio = document.querySelector('input[name="pitchMetric"]:checked');
+        const hasMetric = metricRadio && metricRadio.value !== '-1';
 
-        const opt = PITCHING_OPTIONS[parseInt(checkedRadio.value)];
-        searchInput.value = base + '?player_type=pitcher&pitchers_lookup%5B%5D=' + player.mlb_id
-            + '&hfGT=' + gtStr + '&hfSea=' + seasonsStr + '&' + opt.params;
+        if (checkedPa.length === 0 && !hasMetric) { searchInput.value = ''; return; }
+
+        let url = base + '?player_type=pitcher&pitchers_lookup%5B%5D=' + player.mlb_id
+            + '&hfGT=' + gtStr + '&hfSea=' + seasonsStr;
+
+        if (checkedPa.length > 0) {
+            const events = checkedPa.map(cb => PA_RESULTS[parseInt(cb.value)].event);
+            url += '&hfAB=' + events.map(e => e + '%7C').join('');
+        }
+
+        if (hasMetric) {
+            url += '&' + PITCHING_METRICS[parseInt(metricRadio.value)].params;
+        }
+
+        searchInput.value = url;
     }
 }
 
