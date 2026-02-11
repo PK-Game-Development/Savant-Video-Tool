@@ -871,6 +871,43 @@
             font-family: monospace;
         }
 
+        .sidebar-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: none;
+            border: none;
+            border-bottom: 1px solid #1A2844;
+            width: 100%;
+            padding: 0 0 8px 0;
+            margin: 0 0 12px 0;
+            cursor: pointer;
+            color: #F5C842;
+            font-size: 16px;
+            font-weight: 700;
+            font-family: inherit;
+        }
+
+        .sidebar-toggle:hover { color: #F7D35A; }
+
+        .sidebar-toggle .sidebar-arrow {
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+
+        .sidebar-toggle.collapsed .sidebar-arrow {
+            transform: rotate(-90deg);
+        }
+
+        .sidebar-collapsible {
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .sidebar-collapsible.collapsed {
+            max-height: 0 !important;
+        }
+
         @media (max-width: 960px) {
             .page-layout {
                 flex-direction: column;
@@ -1063,49 +1100,54 @@
         Instagram: <a href="https://www.instagram.com/latenightbaseball" target="_blank">Late Night Baseball</a>
     </div>
 
-    <h3>How to Use This Tool</h3>
+    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebarGuide()">
+        <span>How to Use This Tool</span>
+        <span class="sidebar-arrow">&#9660;</span>
+    </button>
 
-    <p>shorthop.app lets you search, preview, and bulk-download Statcast video clips straight from Baseball Savant.</p>
+    <div class="sidebar-collapsible" id="sidebarCollapsible">
+        <p>shorthop.app lets you search, preview, and bulk-download Statcast video clips straight from Baseball Savant.</p>
 
-    <h4>Quick Start</h4>
-    <ol>
-        <li>Search for a player by name above, or paste a Baseball Savant Statcast Search URL directly into the search bar.</li>
-        <li>Select the seasons and game types you want.</li>
-        <li>Click a <span class="key">Use This URL</span> button next to any hit type or pitch category to load it into the search bar.</li>
-        <li>Hit <span class="key">Search</span> to fetch the matching video clips.</li>
-        <li>Check the clips you want, then click <span class="key">Download Selected</span>.</li>
-    </ol>
+        <h4>Quick Start</h4>
+        <ol>
+            <li>Search for a player by name above, or paste a Baseball Savant Statcast Search URL directly into the search bar.</li>
+            <li>Select the seasons and game types you want.</li>
+            <li>Click a <span class="key">Use This URL</span> button next to any hit type or pitch category to load it into the search bar.</li>
+            <li>Hit <span class="key">Search</span> to fetch the matching video clips.</li>
+            <li>Check the clips you want, then click <span class="key">Download Selected</span>.</li>
+        </ol>
 
-    <h4>Player Search</h4>
-    <p>Type any current or historical player name and press <span class="key">Search Player</span>. The tool will show their headshot, position, team, and links to Savant, MLB, Baseball Reference, Fangraphs, and Roster Resource.</p>
+        <h4>Player Search</h4>
+        <p>Type any current or historical player name and press <span class="key">Search Player</span>. The tool will show their headshot, position, team, and links to Savant, MLB, Baseball Reference, Fangraphs, and Roster Resource.</p>
 
-    <h4>Seasons &amp; Game Types</h4>
-    <p>After finding a player, select one or more seasons (2015 &ndash; present). Then choose which game types to include &mdash; Regular Season is checked by default. You can also add Postseason, Wildcard, Division Series, League Championship, World Series, Spring Training, or All-Star games.</p>
+        <h4>Seasons &amp; Game Types</h4>
+        <p>After finding a player, select one or more seasons (2015 &ndash; present). Then choose which game types to include &mdash; Regular Season is checked by default. You can also add Postseason, Wildcard, Division Series, League Championship, World Series, Spring Training, or All-Star games.</p>
 
-    <h4>Savant URL Tables</h4>
-    <p>Two tables appear for every player:</p>
-    <ul>
-        <li><strong>Batting</strong> &mdash; Singles, Doubles, Triples, Home Runs</li>
-        <li><strong>Pitching</strong> &mdash; Strikeouts, K End of Inning, 100+ MPH, high-break pitches, HRs allowed, RBIs allowed</li>
-    </ul>
-    <p>Each row has a pre-built Savant URL. Click the link to view results on Savant, or click <span class="key">Use This URL</span> to load it here for downloading.</p>
+        <h4>Savant URL Tables</h4>
+        <p>Two tables appear for every player:</p>
+        <ul>
+            <li><strong>Batting</strong> &mdash; Singles, Doubles, Triples, Home Runs</li>
+            <li><strong>Pitching</strong> &mdash; Strikeouts, K End of Inning, 100+ MPH, high-break pitches, HRs allowed, RBIs allowed</li>
+        </ul>
+        <p>Each row has a pre-built Savant URL. Click the link to view results on Savant, or click <span class="key">Use This URL</span> to load it here for downloading.</p>
 
-    <h4>Download Options</h4>
-    <ul>
-        <li><strong>Broadcast</strong> &mdash; Choose Home or Away camera feed.</li>
-        <li><strong>Max videos</strong> &mdash; Set a limit, or leave at 0 for all results.</li>
-        <li><strong>Combine into one video</strong> <span style="background: #2A3855; color: #F5C842; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; vertical-align: middle;">COMING SOON</span> &mdash; Will merge all selected clips into a single file.</li>
-    </ul>
+        <h4>Download Options</h4>
+        <ul>
+            <li><strong>Broadcast</strong> &mdash; Choose Home or Away camera feed.</li>
+            <li><strong>Max videos</strong> &mdash; Set a limit, or leave at 0 for all results.</li>
+            <li><strong>Combine into one video</strong> <span style="background: #2A3855; color: #F5C842; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; vertical-align: middle;">COMING SOON</span> &mdash; Will merge all selected clips into a single file.</li>
+        </ul>
 
-    <h4>Downloading</h4>
-    <p>After searching, a table of video clips appears. Use the checkboxes to pick individual clips, or click <span class="key">Select All</span> / <span class="key">Select None</span>. Then hit <span class="key">Download Selected</span>. A progress bar tracks the download, and when finished the <span class="key">Save to Computer</span> button will appear.</p>
+        <h4>Downloading</h4>
+        <p>After searching, a table of video clips appears. Use the checkboxes to pick individual clips, or click <span class="key">Select All</span> / <span class="key">Select None</span>. Then hit <span class="key">Download Selected</span>. A progress bar tracks the download, and when finished the <span class="key">Save to Computer</span> button will appear.</p>
 
-    <div class="guide-tip">
-        <strong>Tip:</strong> You can paste any valid Baseball Savant Statcast Search URL directly &mdash; you don't have to use the Player Search. Just copy the URL from Savant, paste it in, and click Search.
+        <div class="guide-tip">
+            <strong>Tip:</strong> You can paste any valid Baseball Savant Statcast Search URL directly &mdash; you don't have to use the Player Search. Just copy the URL from Savant, paste it in, and click Search.
+        </div>
+
+        <h4>Custom Savant URLs</h4>
+        <p>For advanced queries, build your own search on <a href="https://baseballsavant.mlb.com/statcast_search" target="_blank" style="color: #7AD4F0;">Baseball Savant</a>, copy the resulting URL from your browser, and paste it into the search bar above.</p>
     </div>
-
-    <h4>Custom Savant URLs</h4>
-    <p>For advanced queries, build your own search on <a href="https://baseballsavant.mlb.com/statcast_search" target="_blank" style="color: #7AD4F0;">Baseball Savant</a>, copy the resulting URL from your browser, and paste it into the search bar above.</p>
 
 </aside>
 
@@ -1949,6 +1991,30 @@ function renderGameLogTable(games, group) {
     html += '</tbody></table>';
     return html;
 }
+
+// --- Sidebar collapsible guide ---
+let sidebarCollapsed = false;
+
+function toggleSidebarGuide() {
+    const toggle = document.getElementById('sidebarToggle');
+    const body = document.getElementById('sidebarCollapsible');
+    sidebarCollapsed = !sidebarCollapsed;
+    if (sidebarCollapsed) {
+        body.style.maxHeight = '0';
+        body.classList.add('collapsed');
+        toggle.classList.add('collapsed');
+    } else {
+        body.classList.remove('collapsed');
+        body.style.maxHeight = body.scrollHeight + 'px';
+        toggle.classList.remove('collapsed');
+    }
+}
+
+// Initialize open on load
+(function() {
+    const body = document.getElementById('sidebarCollapsible');
+    body.style.maxHeight = body.scrollHeight + 'px';
+})();
 
 function exportGameLog() {
     if (!lastGameLogData) return;
