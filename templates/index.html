@@ -35,6 +35,26 @@
             margin-top: 4px;
         }
 
+        .footer-credit {
+            position: fixed;
+            bottom: 16px;
+            left: 16px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #d4af37;
+            text-align: left;
+            z-index: 1000;
+        }
+
+        .footer-credit a {
+            color: #d4af37;
+            text-decoration: none;
+        }
+
+        .footer-credit a:hover {
+            text-decoration: underline;
+        }
+
         .container {
             max-width: 1100px;
             margin: 0 auto;
@@ -773,6 +793,14 @@ document.getElementById('searchUrl').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') doSearch();
 });
 </script>
+
+<div class="footer-credit">
+    Created by Parker Kirk<br>
+    <a href="https://www.x.com/@parkerkirk_" target="_blank">x.com/@parkerkirk_</a><br>
+    Watch/listen to Late Night Baseball<br>
+    <a href="https://www.youtube.com/@LateNightBaseball" target="_blank">YouTube</a><br>
+    <a href="https://www.instagram.com/latenightbaseball" target="_blank">Instagram</a>
+</div>
 
 </body>
 </html>
