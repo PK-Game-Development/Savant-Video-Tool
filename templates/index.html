@@ -205,6 +205,12 @@
 
         .combine-option:hover { border-color: #F5C842; }
 
+        .combine-option.compact {
+            padding: 5px 8px;
+            font-size: 12px;
+            gap: 4px;
+        }
+
         .combine-option input[type="checkbox"] {
             accent-color: #F5C842;
         }
@@ -599,7 +605,7 @@
         <!-- Savant URL Builder (populated by JS after player search) -->
         <div id="savantUrlBuilder" style="display: none; margin-top: 20px; border-top: 1px solid #1A2844; padding-top: 16px;">
             <h4 style="color: #F5C842; margin: 0 0 12px 0; font-size: 16px;">Select Season(s)</h4>
-            <div id="seasonCheckboxes" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;"></div>
+            <div id="seasonCheckboxes" style="display: flex; flex-wrap: nowrap; gap: 6px; margin-bottom: 16px;"></div>
 
             <h4 style="color: #F5C842; margin: 0 0 12px 0; font-size: 16px;">Game Type</h4>
             <div id="gameTypeCheckboxes" style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px;">
@@ -1185,7 +1191,7 @@ function populateSeasonCheckboxes() {
     let html = '';
     for (let year = currentYear; year >= SEASON_START; year--) {
         const checked = (year === currentYear) ? ' checked' : '';
-        html += '<label class="combine-option">'
+        html += '<label class="combine-option compact">'
             + '<input type="checkbox" class="season-year-cb" value="' + year + '"'
             + checked + ' onchange="updateSavantUrls()">'
             + '<span>' + year + '</span></label>';
