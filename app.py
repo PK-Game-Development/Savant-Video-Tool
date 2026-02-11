@@ -28,6 +28,7 @@ from urllib.parse import urlparse, parse_qs, urlencode
 import requests
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from flask import (
     Flask, render_template, request, jsonify, Response, send_file, abort,
 )
@@ -800,7 +801,7 @@ def _build_game_log_xlsx(games, group, player_name, season):
             for cell in row:
                 if cell.value is not None:
                     max_len = max(max_len, len(str(cell.value)))
-        ws.column_dimensions[ws.cell(row=1, column=col_idx).column_letter].width = max_len + 3
+        ws.column_dimensions[get_column_letter(col_idx)].width = max_len + 3
 
     # Write to buffer
     buf = io.BytesIO()
