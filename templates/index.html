@@ -80,7 +80,7 @@
         .container {
             max-width: 1100px;
             margin: 0 auto;
-            padding: 24px 16px;
+            padding: 0;
         }
 
         /* Search Section */
@@ -556,6 +556,114 @@
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Page layout: two-column with sticky sidebar */
+        .page-layout {
+            display: flex;
+            gap: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 24px 16px;
+            align-items: flex-start;
+        }
+
+        .main-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .sidebar-guide {
+            width: 280px;
+            flex-shrink: 0;
+            position: sticky;
+            top: 24px;
+            max-height: calc(100vh - 48px);
+            overflow-y: auto;
+            background: #111A33;
+            border-radius: 8px;
+            border: 1px solid #1A2844;
+            padding: 20px;
+        }
+
+        .sidebar-guide::-webkit-scrollbar { width: 6px; }
+        .sidebar-guide::-webkit-scrollbar-track { background: #111A33; border-radius: 0 8px 8px 0; }
+        .sidebar-guide::-webkit-scrollbar-thumb { background: #2A3855; border-radius: 3px; }
+
+        .sidebar-guide h3 {
+            color: #F5C842;
+            font-size: 16px;
+            margin: 0 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #1A2844;
+        }
+
+        .sidebar-guide h4 {
+            color: #F5C842;
+            font-size: 13px;
+            font-weight: 700;
+            margin: 14px 0 6px 0;
+        }
+
+        .sidebar-guide h4:first-of-type {
+            margin-top: 0;
+        }
+
+        .sidebar-guide p,
+        .sidebar-guide li {
+            color: #9AA8C0;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .sidebar-guide p {
+            margin: 0 0 8px 0;
+        }
+
+        .sidebar-guide ol,
+        .sidebar-guide ul {
+            padding-left: 16px;
+            margin: 0 0 8px 0;
+        }
+
+        .sidebar-guide li {
+            margin-bottom: 4px;
+        }
+
+        .sidebar-guide .guide-tip {
+            background: #0B1026;
+            border-left: 3px solid #F5C842;
+            padding: 8px 10px;
+            border-radius: 0 4px 4px 0;
+            margin: 10px 0;
+            font-size: 12px;
+            color: #9AA8C0;
+        }
+
+        .sidebar-guide .guide-tip strong {
+            color: #F5C842;
+        }
+
+        .sidebar-guide .key {
+            display: inline-block;
+            background: #1A2844;
+            color: #5EC4E6;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-family: monospace;
+        }
+
+        @media (max-width: 960px) {
+            .page-layout {
+                flex-direction: column;
+            }
+            .sidebar-guide {
+                width: 100%;
+                position: static;
+                max-height: none;
+                order: -1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -566,7 +674,8 @@
     <p class="header-support">Consider supporting the developer's work and watch <a href="https://www.youtube.com/@LateNightBaseball" target="_blank">Late Night Baseball</a> on Youtube.</p>
 </div>
 
-<div class="container">
+<div class="page-layout">
+<div class="main-content">
 
     <!-- Player Search -->
     <div class="player-search-section">
@@ -693,7 +802,56 @@
         </div>
     </div>
 
-</div>
+</div><!-- /.main-content -->
+
+<!-- Sidebar Guide -->
+<aside class="sidebar-guide">
+    <h3>How to Use This Tool</h3>
+
+    <p>shorthop.app lets you search, preview, and bulk-download Statcast video clips straight from Baseball Savant.</p>
+
+    <h4>Quick Start</h4>
+    <ol>
+        <li>Search for a player by name above, or paste a Baseball Savant Statcast Search URL directly into the search bar.</li>
+        <li>Select the seasons and game types you want.</li>
+        <li>Click a <span class="key">Use This URL</span> button next to any hit type or pitch category to load it into the search bar.</li>
+        <li>Hit <span class="key">Search</span> to fetch the matching video clips.</li>
+        <li>Check the clips you want, then click <span class="key">Download Selected</span>.</li>
+    </ol>
+
+    <h4>Player Search</h4>
+    <p>Type any current or historical player name and press <span class="key">Search Player</span>. The tool will show their headshot, position, team, and links to Savant, MLB, Baseball Reference, Fangraphs, and Roster Resource.</p>
+
+    <h4>Seasons &amp; Game Types</h4>
+    <p>After finding a player, select one or more seasons (2015 &ndash; present). Then choose which game types to include &mdash; Regular Season is checked by default. You can also add Postseason, Wildcard, Division Series, League Championship, World Series, Spring Training, or All-Star games.</p>
+
+    <h4>Savant URL Tables</h4>
+    <p>Two tables appear for every player:</p>
+    <ul>
+        <li><strong>Batting</strong> &mdash; Singles, Doubles, Triples, Home Runs</li>
+        <li><strong>Pitching</strong> &mdash; Strikeouts, K End of Inning, 100+ MPH, high-break pitches, HRs allowed, RBIs allowed</li>
+    </ul>
+    <p>Each row has a pre-built Savant URL. Click the link to view results on Savant, or click <span class="key">Use This URL</span> to load it here for downloading.</p>
+
+    <h4>Download Options</h4>
+    <ul>
+        <li><strong>Broadcast</strong> &mdash; Choose Home or Away camera feed.</li>
+        <li><strong>Max videos</strong> &mdash; Set a limit, or leave at 0 for all results.</li>
+        <li><strong>Combine into one video</strong> &mdash; Merges all selected clips into a single file.</li>
+    </ul>
+
+    <h4>Downloading</h4>
+    <p>After searching, a table of video clips appears. Use the checkboxes to pick individual clips, or click <span class="key">Select All</span> / <span class="key">Select None</span>. Then hit <span class="key">Download Selected</span>. A progress bar tracks the download, and when finished the <span class="key">Save to Computer</span> button will appear.</p>
+
+    <div class="guide-tip">
+        <strong>Tip:</strong> You can paste any valid Baseball Savant Statcast Search URL directly &mdash; you don't have to use the Player Search. Just copy the URL from Savant, paste it in, and click Search.
+    </div>
+
+    <h4>Custom Savant URLs</h4>
+    <p>For advanced queries, build your own search on <a href="https://baseballsavant.mlb.com/statcast_search" target="_blank" style="color: #7AD4F0;">Baseball Savant</a>, copy the resulting URL from your browser, and paste it into the search bar above.</p>
+</aside>
+
+</div><!-- /.page-layout -->
 
 <script>
 let videoData = [];
