@@ -135,6 +135,17 @@
 
         .btn-download:hover:not(:disabled) { background: #22944a; }
 
+        .btn-save {
+            background: #2a6acf;
+            color: #fff;
+            padding: 14px 32px;
+            font-size: 16px;
+            display: none;
+        }
+
+        .btn-save:hover:not(:disabled) { background: #3a7ae0; }
+        .btn-save.show { display: inline-block; }
+
         .combine-option {
             display: flex;
             align-items: center;
@@ -267,7 +278,6 @@
         .badge-done { background: #1a3a1a; color: #7aee7a; }
         .badge-failed { background: #3a1a1a; color: #ee7a7a; }
         .badge-skipped { background: #3a3a1a; color: #eecc7a; }
-        .badge-exists { background: #1a3a1a; color: #7aee7a; }
 
         .checkbox-cell { width: 40px; text-align: center; }
 
@@ -316,6 +326,11 @@
             color: #fff;
             font-size: 14px;
             margin-bottom: 8px;
+        }
+
+        .progress-actions {
+            margin-top: 16px;
+            text-align: center;
         }
 
         /* Preview Link */
@@ -401,6 +416,9 @@
             <span id="progressCount">0 / 0</span>
             <span id="progressPct">0%</span>
         </div>
+        <div class="progress-actions">
+            <button class="btn btn-save" id="saveBtn" onclick="saveFile()">Save to Computer</button>
+        </div>
     </div>
 
     <!-- Results -->
@@ -413,7 +431,7 @@
             <div class="results-actions">
                 <button class="btn btn-select" onclick="selectAll()">Select All</button>
                 <button class="btn btn-select" onclick="selectNone()">Select None</button>
-                <label class="combine-option" title="After downloading, combine all clips into a single video file">
+                <label class="combine-option" title="Combine all clips into a single video file">
                     <input type="checkbox" id="combineCheck">
                     <span>Combine into one video</span>
                 </label>
@@ -449,7 +467,7 @@
 
 <script>
 let videoData = [];
-let downloadedFilenames = [];
+let currentJobId = null;
 
 function showStatus(msg, type) {
     const el = document.getElementById('statusMsg');
@@ -475,6 +493,8 @@ async function doSearch() {
     btn.innerHTML = '<span class="spinner"></span>Searching...';
     hideStatus();
     document.getElementById('resultsSection').classList.remove('show');
+    document.getElementById('progressSection').classList.remove('show');
+    document.getElementById('saveBtn').classList.remove('show');
 
     try {
         const resp = await fetch('/api/search', {
@@ -519,16 +539,9 @@ function renderTable(videos) {
         const tr = document.createElement('tr');
         tr.id = 'row-' + i;
 
-        let statusBadge;
-        if (v.downloaded) {
-            statusBadge = '<span class="badge badge-exists">Downloaded</span>';
-        } else {
-            statusBadge = '<span class="badge badge-ready">Ready</span>';
-        }
-
         tr.innerHTML = `
             <td class="checkbox-cell">
-                <input type="checkbox" class="vid-check" data-index="${i}" ${v.downloaded ? '' : 'checked'}>
+                <input type="checkbox" class="vid-check" data-index="${i}" checked>
             </td>
             <td class="player">${esc(v.player)}</td>
             <td class="date">${esc(v.date)}</td>
@@ -536,9 +549,9 @@ function renderTable(videos) {
             <td class="stat">${esc(v.pitch_type || '-')}</td>
             <td class="stat">${v.release_speed ? esc(v.release_speed) + ' mph' : '-'}</td>
             <td class="stat">${v.launch_speed ? esc(v.launch_speed) + ' mph' : '-'}</td>
-            <td class="stat">${v.launch_angle ? esc(v.launch_angle) + '°' : '-'}</td>
+            <td class="stat">${v.launch_angle ? esc(v.launch_angle) + '\u00b0' : '-'}</td>
             <td><a class="preview-link" href="${esc(v.savant_url)}" target="_blank">View</a></td>
-            <td class="status-cell" id="status-${i}">${statusBadge}</td>
+            <td class="status-cell" id="status-${i}"><span class="badge badge-ready">Ready</span></td>
         `;
         tbody.appendChild(tr);
     });
@@ -577,10 +590,12 @@ async function doDownload() {
     }
 
     const broadcast = document.getElementById('broadcast').value;
+    const combine = document.getElementById('combineCheck').checked;
     const btn = document.getElementById('downloadBtn');
     btn.disabled = true;
 
     hideStatus();
+    document.getElementById('saveBtn').classList.remove('show');
 
     // Mark selected rows as queued
     document.querySelectorAll('.vid-check:checked').forEach(cb => {
@@ -589,23 +604,23 @@ async function doDownload() {
             '<span class="badge badge-ready">Queued</span>';
     });
 
-    // Start download job
+    // Start the job (download + optional combine/zip all handled server-side)
     try {
         const resp = await fetch('/api/download', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({videos: selected, broadcast: broadcast}),
+            body: JSON.stringify({videos: selected, broadcast: broadcast, combine: combine}),
         });
         const data = await resp.json();
 
         if (!resp.ok) {
-            showStatus(data.error || 'Download failed to start.', 'error');
+            showStatus(data.error || 'Failed to start.', 'error');
             btn.disabled = false;
             return;
         }
 
-        // Show progress and track via SSE
-        trackProgress(data.job_id, selected);
+        currentJobId = data.job_id;
+        trackProgress(data.job_id);
 
     } catch (err) {
         showStatus('Network error: ' + err.message, 'error');
@@ -613,7 +628,7 @@ async function doDownload() {
     }
 }
 
-function trackProgress(jobId, selected) {
+function trackProgress(jobId) {
     const progSection = document.getElementById('progressSection');
     const progBar = document.getElementById('progressBar');
     const progCount = document.getElementById('progressCount');
@@ -621,6 +636,7 @@ function trackProgress(jobId, selected) {
     const progCurrent = document.getElementById('progressCurrent');
 
     progSection.classList.add('show');
+    progBar.style.width = '0%';
 
     const evtSource = new EventSource('/api/progress/' + jobId);
 
@@ -635,19 +651,33 @@ function trackProgress(jobId, selected) {
 
         const done = job.completed + job.failed;
         const total = job.total;
-        const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+        const phase = job.phase || 'downloading';
 
-        progBar.style.width = pct + '%';
-        progCount.textContent = `${done} / ${total}`;
-        progPct.textContent = pct + '%';
+        // Update progress based on phase
+        if (phase === 'downloading') {
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            progBar.style.width = pct + '%';
+            progCount.textContent = `${done} / ${total}`;
+            progPct.textContent = pct + '%';
 
-        if (job.current) {
-            progCurrent.innerHTML = '<span class="spinner"></span>Downloading: ' + esc(job.current);
+            if (job.current) {
+                progCurrent.innerHTML = '<span class="spinner"></span>Downloading: ' + esc(job.current);
+            }
+        } else if (phase === 'combining') {
+            progBar.style.width = '100%';
+            progBar.style.background = 'linear-gradient(90deg, #c0a040, #d4b050)';
+            progCurrent.innerHTML = '<span class="spinner"></span>Combining all clips into one video...';
+            progCount.textContent = `${done} clips`;
+            progPct.textContent = '...';
+        } else if (phase === 'zipping') {
+            progBar.style.width = '100%';
+            progBar.style.background = 'linear-gradient(90deg, #2a6acf, #3a7ae0)';
+            progCurrent.innerHTML = '<span class="spinner"></span>Packaging files for download...';
+            progPct.textContent = '...';
         }
 
         // Update row statuses from results
-        job.results.forEach((r, i) => {
-            // Find the matching video in the table
+        job.results.forEach(r => {
             const filename = r.filename;
             const vidIdx = videoData.findIndex(v => v.filename === filename);
             if (vidIdx === -1) return;
@@ -659,32 +689,31 @@ function trackProgress(jobId, selected) {
                 cell.innerHTML = '<span class="badge badge-done">Done</span>';
             } else if (r.status === 'failed') {
                 cell.innerHTML = '<span class="badge badge-failed">Failed</span>';
-            } else if (r.status === 'skipped') {
-                cell.innerHTML = '<span class="badge badge-skipped">Skipped</span>';
             }
         });
 
         if (job.status === 'done') {
             evtSource.close();
             document.getElementById('downloadBtn').disabled = false;
+            progBar.style.background = '';
 
-            // Collect successfully downloaded filenames
-            downloadedFilenames = job.results
-                .filter(r => r.status === 'ok')
-                .map(r => r.filename);
+            if (job.download_ready && job.download_file) {
+                progBar.style.width = '100%';
+                progPct.textContent = '100%';
 
-            const shouldCombine = document.getElementById('combineCheck').checked;
+                const isCombined = job.download_file.endsWith('.mp4');
+                const label = isCombined ? 'Combined video ready!' : 'Files packaged!';
+                progCurrent.textContent = label;
 
-            if (shouldCombine && downloadedFilenames.length >= 2) {
-                // Auto-trigger combine
-                progCurrent.innerHTML = '<span class="spinner"></span>Now combining all clips into one video...';
-                progBar.style.width = '0%';
-                progPct.textContent = '...';
-                progCount.textContent = `${downloadedFilenames.length} clips`;
-                runCombine();
+                const saveBtn = document.getElementById('saveBtn');
+                saveBtn.textContent = isCombined ? 'Save Video to Computer' : 'Save Zip to Computer';
+                saveBtn.classList.add('show');
+
+                const msg = `Done! ${job.completed} clips processed. Click "Save" to download.`;
+                showStatus(msg, 'success');
             } else {
                 progCurrent.textContent = 'Complete!';
-                const msg = `Download complete: ${job.completed} downloaded, ${job.failed} failed.`;
+                const msg = `Done: ${job.completed} downloaded, ${job.failed} failed.`;
                 showStatus(msg, job.failed > 0 ? 'info' : 'success');
             }
         }
@@ -693,7 +722,6 @@ function trackProgress(jobId, selected) {
     evtSource.onerror = function() {
         evtSource.close();
         document.getElementById('downloadBtn').disabled = false;
-        // Try polling as fallback
         pollProgress(jobId);
     };
 }
@@ -703,7 +731,12 @@ async function pollProgress(jobId) {
         const resp = await fetch('/api/status/' + jobId);
         const job = await resp.json();
         if (job.status === 'done') {
-            showStatus(`Download complete: ${job.completed} downloaded, ${job.failed} failed.`, 'success');
+            if (job.download_ready && job.download_file) {
+                document.getElementById('saveBtn').classList.add('show');
+                showStatus('Ready! Click "Save" to download your file.', 'success');
+            } else {
+                showStatus(`Done: ${job.completed} downloaded, ${job.failed} failed.`, 'success');
+            }
         } else {
             setTimeout(() => pollProgress(jobId), 1000);
         }
@@ -712,58 +745,12 @@ async function pollProgress(jobId) {
     }
 }
 
-async function runCombine() {
-    const progBar = document.getElementById('progressBar');
-    const progCurrent = document.getElementById('progressCurrent');
-    const progPct = document.getElementById('progressPct');
-
-    try {
-        const resp = await fetch('/api/combine', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                filenames: downloadedFilenames,
-                output_name: 'combined_video.mp4',
-            }),
-        });
-        const data = await resp.json();
-
-        if (!resp.ok) {
-            showStatus(data.error || 'Combine failed.', 'error');
-            progCurrent.textContent = 'Combine failed.';
-            return;
-        }
-
-        // Poll for completion
-        const jobId = data.job_id;
-        const poll = async () => {
-            const statusResp = await fetch('/api/status/' + jobId);
-            const job = await statusResp.json();
-
-            if (job.status === 'done') {
-                progBar.style.width = '100%';
-                progPct.textContent = '100%';
-
-                const result = job.results[0];
-                if (result && result.status === 'ok') {
-                    progCurrent.textContent = 'All done! Combined video ready.';
-                    showStatus('All videos downloaded and combined into combined_video.mp4 in your Downloads folder!', 'success');
-                } else {
-                    const errMsg = (result && result.error) || 'Unknown error';
-                    progCurrent.textContent = 'Combine failed.';
-                    showStatus('Downloads finished but combine failed: ' + errMsg, 'error');
-                }
-            } else {
-                progBar.style.width = '50%';
-                setTimeout(poll, 1000);
-            }
-        };
-        poll();
-
-    } catch (err) {
-        showStatus('Network error during combine: ' + err.message, 'error');
-        progCurrent.textContent = 'Combine failed.';
-    }
+function saveFile() {
+    if (!currentJobId) return;
+    // Trigger browser download via hidden link
+    const a = document.createElement('a');
+    a.href = '/api/download-file/' + currentJobId;
+    a.click();
 }
 
 // Allow Enter key to trigger search

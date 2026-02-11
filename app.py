@@ -2,9 +2,11 @@
 """
 Baseball Savant Video Downloader - Web App
 
-Flask web interface for downloading videos from Baseball Savant search pages.
-Run with: python app.py
-Then open http://localhost:5000 in your browser.
+Self-contained web app that fetches, downloads, and optionally combines
+Baseball Savant video clips. Works fully in-browser — no local install needed.
+
+Locally:  python app.py
+Deploy:   Docker / Render / Railway
 """
 
 import csv
@@ -18,24 +20,35 @@ import tempfile
 import threading
 import time
 import uuid
+import zipfile
 from collections import defaultdict
 from urllib.parse import urlparse, parse_qs, urlencode
 
 import requests
-from flask import Flask, render_template, request, jsonify, Response, send_from_directory
+from flask import (
+    Flask, render_template, request, jsonify, Response, send_file, abort,
+)
 
 app = Flask(__name__)
 
 # --- Config ---
-DOWNLOAD_DIR = os.path.join(os.path.expanduser("~"), "Downloads")
 STATCAST_CSV_BASE = "https://baseballsavant.mlb.com/statcast_search/csv"
 MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
 VIDEO_CDN_URL = "https://fastball-clips.mlb.com/{game_pk}/{broadcast}/{play_id}.mp4"
 SPORTY_VIDEO_URL = "https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
 
-# Active download jobs: job_id -> job state dict
+# Base temp directory for all jobs
+WORK_DIR = os.path.join(tempfile.gettempdir(), "savant_jobs")
+os.makedirs(WORK_DIR, exist_ok=True)
+
+# How long to keep job files before cleanup (seconds)
+JOB_TTL = 3600  # 1 hour
+
+# Active jobs: job_id -> job state dict
 jobs = {}
 
+
+# --- Helpers ---
 
 def create_session():
     session = requests.Session()
@@ -110,13 +123,9 @@ def download_video_file(url, output_path, session):
     }
     resp = session.get(url, stream=True, timeout=120, headers=headers)
     resp.raise_for_status()
-    total = int(resp.headers.get("content-length", 0))
-    downloaded = 0
     with open(output_path, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
-            downloaded += len(chunk)
-    return total
 
 
 def try_download(game_pk, play_id, broadcast, output_path, session):
@@ -131,7 +140,52 @@ def try_download(game_pk, play_id, broadcast, output_path, session):
     return False
 
 
-# ---- Routes ----
+def combine_videos(file_paths, output_path):
+    """Combine multiple mp4 files into one using ffmpeg concat demuxer."""
+    if not shutil.which("ffmpeg"):
+        raise RuntimeError("ffmpeg is not installed on this server.")
+
+    tmp_fd, tmp_list = tempfile.mkstemp(suffix=".txt")
+    try:
+        with os.fdopen(tmp_fd, "w") as f:
+            for path in file_paths:
+                escaped = path.replace("'", "'\\''")
+                f.write(f"file '{escaped}'\n")
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", tmp_list,
+            "-c", "copy",
+            output_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if result.returncode != 0:
+            raise RuntimeError(f"ffmpeg failed: {result.stderr[:500]}")
+    finally:
+        os.unlink(tmp_list)
+
+
+def get_job_dir(job_id):
+    """Return the temp directory for a specific job."""
+    return os.path.join(WORK_DIR, job_id)
+
+
+def cleanup_old_jobs():
+    """Remove job directories older than JOB_TTL."""
+    now = time.time()
+    try:
+        for name in os.listdir(WORK_DIR):
+            path = os.path.join(WORK_DIR, name)
+            if os.path.isdir(path) and (now - os.path.getmtime(path)) > JOB_TTL:
+                shutil.rmtree(path, ignore_errors=True)
+                jobs.pop(name, None)
+    except OSError:
+        pass
+
+
+# --- Routes ---
 
 @app.route("/")
 def index():
@@ -218,34 +272,47 @@ def api_search():
 
 @app.route("/api/download", methods=["POST"])
 def api_download():
-    """Start a download job for selected videos. Returns a job ID for progress tracking."""
+    """Start a download job. Downloads videos to a server temp directory."""
     data = request.get_json()
     videos = data.get("videos", [])
     broadcast = data.get("broadcast", "home")
+    combine = data.get("combine", False)
 
     if not videos:
         return jsonify({"error": "No videos selected"}), 400
 
+    # Cleanup old jobs opportunistically
+    cleanup_old_jobs()
+
     job_id = str(uuid.uuid4())[:8]
+    job_dir = get_job_dir(job_id)
+    os.makedirs(job_dir, exist_ok=True)
+
     jobs[job_id] = {
         "status": "running",
+        "phase": "downloading",
         "total": len(videos),
         "completed": 0,
         "failed": 0,
         "current": "",
         "results": [],
+        "combine": combine,
+        "download_ready": False,
+        "download_file": None,
+        "job_dir": job_dir,
     }
 
-    def run_downloads():
-        os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+    def run_job():
         session = create_session()
         job = jobs[job_id]
+        downloaded_paths = []
 
+        # Phase 1: Download all videos
         for video in videos:
             game_pk = video["game_pk"]
             play_id = video["play_id"]
             filename = video["filename"]
-            output_path = os.path.join(DOWNLOAD_DIR, filename)
+            output_path = os.path.join(job_dir, filename)
 
             job["current"] = f"{video.get('player', '')} - {video.get('date', '')}"
 
@@ -254,18 +321,59 @@ def api_download():
             if success:
                 job["completed"] += 1
                 job["results"].append({"filename": filename, "status": "ok"})
+                downloaded_paths.append(output_path)
             else:
                 job["failed"] += 1
                 job["results"].append({"filename": filename, "status": "failed"})
                 if os.path.exists(output_path):
                     os.remove(output_path)
 
-            time.sleep(0.5)
+            time.sleep(0.3)
 
+        # Phase 2: Combine if requested
+        if combine and len(downloaded_paths) >= 2:
+            job["phase"] = "combining"
+            job["current"] = "Combining all clips into one video..."
+            try:
+                combined_path = os.path.join(job_dir, "combined_video.mp4")
+                combine_videos(downloaded_paths, combined_path)
+                job["download_file"] = "combined_video.mp4"
+                job["download_ready"] = True
+            except Exception as e:
+                job["results"].append({
+                    "filename": "combined_video.mp4",
+                    "status": "failed",
+                    "error": str(e),
+                })
+
+        elif combine and len(downloaded_paths) == 1:
+            # Only one video — just offer it directly
+            job["download_file"] = os.path.basename(downloaded_paths[0])
+            job["download_ready"] = True
+
+        elif not combine and downloaded_paths:
+            # No combine — zip all individual files
+            job["phase"] = "zipping"
+            job["current"] = "Packaging files..."
+            try:
+                zip_path = os.path.join(job_dir, "savant_videos.zip")
+                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
+                    for path in downloaded_paths:
+                        zf.write(path, os.path.basename(path))
+                job["download_file"] = "savant_videos.zip"
+                job["download_ready"] = True
+            except Exception as e:
+                job["results"].append({
+                    "filename": "savant_videos.zip",
+                    "status": "failed",
+                    "error": str(e),
+                })
+
+        job["phase"] = "done"
         job["status"] = "done"
         job["current"] = ""
 
-    thread = threading.Thread(target=run_downloads, daemon=True)
+    thread = threading.Thread(target=run_job, daemon=True)
     thread.start()
 
     return jsonify({"job_id": job_id})
@@ -273,23 +381,26 @@ def api_download():
 
 @app.route("/api/status/<job_id>")
 def api_status(job_id):
-    """Get the current status of a download job."""
+    """Get the current status of a job."""
     job = jobs.get(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
-    return jsonify(job)
+    # Don't leak internal paths to the client
+    safe = {k: v for k, v in job.items() if k != "job_dir"}
+    return jsonify(safe)
 
 
 @app.route("/api/progress/<job_id>")
 def api_progress(job_id):
-    """Server-Sent Events stream for real-time download progress."""
+    """Server-Sent Events stream for real-time progress."""
     def generate():
         while True:
             job = jobs.get(job_id)
             if not job:
                 yield f"data: {json.dumps({'error': 'Job not found'})}\n\n"
                 break
-            yield f"data: {json.dumps(job)}\n\n"
+            safe = {k: v for k, v in job.items() if k != "job_dir"}
+            yield f"data: {json.dumps(safe)}\n\n"
             if job["status"] == "done":
                 break
             time.sleep(0.5)
@@ -297,91 +408,28 @@ def api_progress(job_id):
     return Response(generate(), mimetype="text/event-stream")
 
 
-def combine_videos(file_paths, output_path):
-    """Combine multiple mp4 files into one using ffmpeg's concat demuxer."""
-    if not shutil.which("ffmpeg"):
-        raise RuntimeError("ffmpeg is not installed. Install it with: brew install ffmpeg")
+@app.route("/api/download-file/<job_id>")
+def api_download_file(job_id):
+    """Download the final file (combined video or zip) for a completed job."""
+    job = jobs.get(job_id)
+    if not job:
+        abort(404)
+    if not job.get("download_ready"):
+        abort(404)
 
-    # Create a temporary file list for ffmpeg
-    tmp_fd, tmp_list = tempfile.mkstemp(suffix=".txt")
-    try:
-        with os.fdopen(tmp_fd, "w") as f:
-            for path in file_paths:
-                # ffmpeg concat demuxer needs escaped single quotes in paths
-                escaped = path.replace("'", "'\\''")
-                f.write(f"file '{escaped}'\n")
+    filename = job["download_file"]
+    file_path = os.path.join(job["job_dir"], filename)
 
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", tmp_list,
-            "-c", "copy",
-            output_path,
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if result.returncode != 0:
-            raise RuntimeError(f"ffmpeg failed: {result.stderr}")
-    finally:
-        os.unlink(tmp_list)
+    if not os.path.exists(file_path):
+        abort(404)
 
-    return os.path.getsize(output_path)
-
-
-@app.route("/api/combine", methods=["POST"])
-def api_combine():
-    """Combine downloaded videos into a single video file."""
-    data = request.get_json()
-    filenames = data.get("filenames", [])
-    output_name = data.get("output_name", "combined_video.mp4")
-
-    if not filenames:
-        return jsonify({"error": "No filenames provided"}), 400
-
-    # Verify all files exist
-    file_paths = []
-    for fn in filenames:
-        path = os.path.join(DOWNLOAD_DIR, fn)
-        if not os.path.exists(path):
-            return jsonify({"error": f"File not found: {fn}"}), 404
-        file_paths.append(path)
-
-    output_path = os.path.join(DOWNLOAD_DIR, output_name)
-
-    job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {
-        "status": "running",
-        "total": len(file_paths),
-        "completed": 0,
-        "failed": 0,
-        "current": "Combining videos...",
-        "results": [],
-    }
-
-    def run_combine():
-        job = jobs[job_id]
-        try:
-            combine_videos(file_paths, output_path)
-            job["completed"] = len(file_paths)
-            job["results"].append({"filename": output_name, "status": "ok"})
-        except Exception as e:
-            job["failed"] = 1
-            job["results"].append({"filename": output_name, "status": "failed", "error": str(e)})
-        job["status"] = "done"
-        job["current"] = ""
-
-    thread = threading.Thread(target=run_combine, daemon=True)
-    thread.start()
-
-    return jsonify({"job_id": job_id, "output_name": output_name})
-
-
-@app.route("/videos/<filename>")
-def serve_video(filename):
-    """Serve a downloaded video file."""
-    return send_from_directory(DOWNLOAD_DIR, filename)
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name=filename,
+    )
 
 
 if __name__ == "__main__":
-    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host="0.0.0.0", port=port)
