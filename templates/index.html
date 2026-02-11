@@ -1468,7 +1468,7 @@ playerInput.addEventListener('input', function() {
     if (suggestAbort) { suggestAbort.abort(); suggestAbort = null; }
     const val = this.value.trim();
     if (val.length < 2) { hideSuggestions(); return; }
-    suggestTimer = setTimeout(() => fetchSuggestions(val), 140);
+    suggestTimer = setTimeout(() => fetchSuggestions(val), 40);
 });
 
 async function fetchSuggestions(query) {
