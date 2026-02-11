@@ -556,7 +556,7 @@
 
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* Game Log fold-out */
+        /* Game Logs fold-out */
         .game-log-section {
             display: none;
             margin-bottom: 20px;
@@ -944,11 +944,11 @@
         </div>
     </div>
 
-    <!-- Game Log (fold-out) -->
+    <!-- Game Logs (fold-out) -->
     <div class="game-log-section" id="gameLogSection">
         <div class="game-log-toggle" id="gameLogToggle" onclick="toggleGameLog()">
             <div class="toggle-left">
-                <span>Game Log</span>
+                <span>Game Logs</span>
             </div>
             <span class="toggle-arrow">&#9660;</span>
         </div>
@@ -959,11 +959,11 @@
                     <option value="hitting">Batting</option>
                     <option value="pitching">Pitching</option>
                 </select>
-                <button class="btn-fetch-log" id="fetchLogBtn" onclick="fetchGameLog()">Load Game Log</button>
+                <button class="btn-fetch-log" id="fetchLogBtn" onclick="fetchGameLog()">Load Game Logs</button>
                 <button class="btn-fetch-log" id="exportLogBtn" onclick="exportGameLog()" style="background: #5EC4E6; display: none;">Export XLSX</button>
             </div>
             <div class="game-log-scroll">
-                <div id="gameLogContent" class="game-log-empty">Select a season and click "Load Game Log"</div>
+                <div id="gameLogContent" class="game-log-empty">Select a season and click "Load Game Logs"</div>
             </div>
         </div>
     </div>
@@ -1595,7 +1595,7 @@ function useUrl(btn) {
     showStatus('URL loaded into search bar. Click "Search" to find videos.', 'info');
 }
 
-// --- Game Log ---
+// --- Game Logs ---
 let gameLogPlayerId = null;
 let gameLogPlayerName = '';
 let lastGameLogData = null;
@@ -1626,7 +1626,7 @@ function showGameLogSection(player) {
     }
 
     // Reset body
-    document.getElementById('gameLogContent').innerHTML = '<div class="game-log-empty">Select a season and click "Load Game Log"</div>';
+    document.getElementById('gameLogContent').innerHTML = '<div class="game-log-empty">Select a season and click "Load Game Logs"</div>';
 
     // Collapse by default
     document.getElementById('gameLogToggle').classList.remove('open');
@@ -1659,7 +1659,7 @@ function fetchGameLog() {
     .then(r => r.json())
     .then(data => {
         btn.disabled = false;
-        btn.textContent = 'Load Game Log';
+        btn.textContent = 'Load Game Logs';
 
         if (data.error) {
             content.innerHTML = '<div class="game-log-empty">' + esc(data.error) + '</div>';
@@ -1680,7 +1680,7 @@ function fetchGameLog() {
     })
     .catch(err => {
         btn.disabled = false;
-        btn.textContent = 'Load Game Log';
+        btn.textContent = 'Load Game Logs';
         content.innerHTML = '<div class="game-log-empty">Error loading game log.</div>';
         lastGameLogData = null;
         document.getElementById('exportLogBtn').style.display = 'none';

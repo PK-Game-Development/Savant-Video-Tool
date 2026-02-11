@@ -714,12 +714,22 @@ def api_game_log():
 @app.route("/api/game-log/export", methods=["POST"])
 def api_game_log_export():
     """Export game log data as an XLSX file."""
-    data = request.get_json()
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "Invalid request"}), 400
+
     games = data.get("games", [])
     group = data.get("group", "hitting")
-    player_name = data.get("player_name", "Player")
-    season = data.get("season", "")
+    player_name = str(data.get("player_name", "Player"))
+    season = str(data.get("season", ""))
 
+    try:
+        return _build_game_log_xlsx(games, group, player_name, season)
+    except Exception as e:
+        return jsonify({"error": f"Export failed: {e}"}), 500
+
+
+def _build_game_log_xlsx(games, group, player_name, season):
     wb = Workbook()
     ws = wb.active
     ws.title = f"{season} Game Log"
@@ -743,7 +753,7 @@ def api_game_log_export():
 
     # Title
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
-    title_cell = ws.cell(row=1, column=1, value=f"{player_name} — {season} {'Batting' if group == 'hitting' else 'Pitching'} Game Log")
+    title_cell = ws.cell(row=1, column=1, value=f"{player_name} - {season} {'Batting' if group == 'hitting' else 'Pitching'} Game Log")
     title_cell.font = title_font
     title_cell.fill = title_fill
     title_cell.alignment = Alignment(horizontal="center")
