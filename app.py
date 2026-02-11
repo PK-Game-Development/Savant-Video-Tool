@@ -167,10 +167,10 @@ def normalize_clip(input_path, output_path):
         cmd.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"])
 
     cmd.extend([
-        "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
-               "pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-ar", "48000", "-ac", "2", "-c:a", "aac", "-b:a", "128k",
+        "-vf", "scale=960:540:force_original_aspect_ratio=decrease,"
+               "pad=960:540:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+        "-ar", "44100", "-ac", "1", "-c:a", "aac", "-b:a", "96k",
     ])
 
     if not has_audio:
@@ -178,7 +178,7 @@ def normalize_clip(input_path, output_path):
 
     cmd.extend(["-movflags", "+faststart", output_path])
 
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
     if result.returncode != 0:
         raise RuntimeError(
             f"ffmpeg normalize failed for {os.path.basename(input_path)}: "
