@@ -427,14 +427,22 @@ def api_progress(job_id):
 def api_download_file(job_id):
     """Download the final file (combined video or zip) for a completed job."""
     job = jobs.get(job_id)
-    if not job:
-        abort(404)
-    if not job.get("download_ready"):
-        abort(404)
+    job_dir = get_job_dir(job_id)
 
-    filename = job["download_file"]
-    file_path = os.path.join(job["job_dir"], filename)
+    if job and job.get("download_ready"):
+        filename = job["download_file"]
+    else:
+        # Fallback: look for the expected output files on disk
+        if not os.path.isdir(job_dir):
+            abort(404)
+        for name in ("combined_video.mp4", "savant_videos.zip"):
+            if os.path.exists(os.path.join(job_dir, name)):
+                filename = name
+                break
+        else:
+            abort(404)
 
+    file_path = os.path.join(job_dir, filename)
     if not os.path.exists(file_path):
         abort(404)
 

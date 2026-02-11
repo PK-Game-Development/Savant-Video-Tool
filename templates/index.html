@@ -747,10 +747,8 @@ async function pollProgress(jobId) {
 
 function saveFile() {
     if (!currentJobId) return;
-    // Trigger browser download via hidden link
-    const a = document.createElement('a');
-    a.href = '/api/download-file/' + currentJobId;
-    a.click();
+    // Open the download URL directly — the server sends Content-Disposition: attachment
+    window.open('/api/download-file/' + currentJobId, '_blank');
 }
 
 // Allow Enter key to trigger search
