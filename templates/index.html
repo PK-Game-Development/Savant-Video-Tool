@@ -912,6 +912,14 @@ async function doPlayerSearch() {
     hideStatus();
     document.getElementById('playerResults').style.display = 'none';
 
+    // Clear previous video results
+    videoData = [];
+    currentJobId = null;
+    document.getElementById('resultsSection').classList.remove('show');
+    document.getElementById('progressSection').classList.remove('show');
+    document.getElementById('saveBtn').classList.remove('show');
+    document.getElementById('searchUrl').value = '';
+
     try {
         const resp = await fetch('/api/player-search', {
             method: 'POST',
@@ -1019,10 +1027,17 @@ function renderPlayerDetail(index) {
     html += '<span>' + lastYear + ' (Last Season)</span></label>';
     html += '</div>';
 
-    // Hit type URL table
-    html += '<div style="margin-top: 16px;"><div class="video-table-wrap"><table class="video-table">';
+    // Batting URL table
+    html += '<h4 style="color: #F5C842; margin: 16px 0 8px 0; font-size: 14px;">Batting</h4>';
+    html += '<div class="video-table-wrap"><table class="video-table">';
     html += '<thead><tr><th>Hit Type</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>';
-    html += '<tbody id="hitTypeBody"></tbody></table></div></div>';
+    html += '<tbody id="hitTypeBody"></tbody></table></div>';
+
+    // Pitching URL table
+    html += '<h4 style="color: #F5C842; margin: 16px 0 8px 0; font-size: 14px;">Pitching</h4>';
+    html += '<div class="video-table-wrap"><table class="video-table">';
+    html += '<thead><tr><th>Category</th><th>Savant Search URL</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>';
+    html += '<tbody id="pitchTypeBody"></tbody></table></div>';
 
     detail.innerHTML = html;
     updateSavantUrls();
@@ -1032,14 +1047,16 @@ function updateSavantUrls() {
     const player = playerSearchResults[selectedPlayerIndex];
     if (!player) return;
 
-    const tbody = document.getElementById('hitTypeBody');
-    if (!tbody) return;
+    const hitBody = document.getElementById('hitTypeBody');
+    const pitchBody = document.getElementById('pitchTypeBody');
+    if (!hitBody || !pitchBody) return;
 
     const currentChecked = document.getElementById('seasonCurrent')?.checked;
     const lastChecked = document.getElementById('seasonLast')?.checked;
 
     if (!currentChecked && !lastChecked) {
-        tbody.innerHTML = '';
+        hitBody.innerHTML = '';
+        pitchBody.innerHTML = '';
         return;
     }
 
@@ -1055,6 +1072,21 @@ function updateSavantUrls() {
         seasonKey = '' + lastYear;
     }
 
+    function buildRows(types) {
+        let html = '';
+        for (const t of types) {
+            const urlKey = t.key + '_' + seasonKey;
+            const url = player.savant_urls[urlKey] || '';
+            const truncated = url.length > 70 ? url.substring(0, 70) + '...' : url;
+            html += '<tr class="hit-type-row">';
+            html += '<td class="hit-type-label">' + esc(t.label) + '</td>';
+            html += '<td class="hit-type-url"><a href="' + esc(url) + '" target="_blank">' + esc(truncated) + '</a></td>';
+            html += '<td style="text-align: center;"><button class="btn-use-url" onclick="useUrl(this)" data-url="' + esc(url) + '">Use This URL</button></td>';
+            html += '</tr>';
+        }
+        return html;
+    }
+
     const hitTypes = [
         {label: 'Singles', key: 'Singles'},
         {label: 'Doubles', key: 'Doubles'},
@@ -1062,19 +1094,18 @@ function updateSavantUrls() {
         {label: 'Home Runs', key: 'Home Runs'},
     ];
 
-    let html = '';
-    for (const ht of hitTypes) {
-        const urlKey = ht.key + '_' + seasonKey;
-        const url = player.savant_urls[urlKey] || '';
-        const truncated = url.length > 70 ? url.substring(0, 70) + '...' : url;
+    const pitchTypes = [
+        {label: 'Strikeouts', key: 'P_Strikeouts'},
+        {label: 'K End of Inning', key: 'P_K End of Inning'},
+        {label: '100+ MPH', key: 'P_100+ MPH'},
+        {label: '12"+ Vertical Break', key: 'P_12in+ Vertical Break'},
+        {label: '12"+ Horizontal Break', key: 'P_12in+ Horizontal Break'},
+        {label: 'Home Runs Allowed', key: 'P_Home Runs Allowed'},
+        {label: 'RBIs Allowed', key: 'P_RBIs Allowed'},
+    ];
 
-        html += '<tr class="hit-type-row">';
-        html += '<td class="hit-type-label">' + esc(ht.label) + '</td>';
-        html += '<td class="hit-type-url"><a href="' + esc(url) + '" target="_blank">' + esc(truncated) + '</a></td>';
-        html += '<td style="text-align: center;"><button class="btn-use-url" onclick="useUrl(this)" data-url="' + esc(url) + '">Use This URL</button></td>';
-        html += '</tr>';
-    }
-    tbody.innerHTML = html;
+    hitBody.innerHTML = buildRows(hitTypes);
+    pitchBody.innerHTML = buildRows(pitchTypes);
 }
 
 function useUrl(btn) {

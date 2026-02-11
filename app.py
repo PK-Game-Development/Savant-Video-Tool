@@ -378,6 +378,28 @@ def api_player_search():
                     f"&hfGT=R%7C"
                 )
 
+        # Pitcher Savant URLs
+        pitcher_base = (
+            f"https://baseballsavant.mlb.com/statcast_search"
+            f"?player_type=pitcher"
+            f"&pitchers_lookup%5B%5D={mlb_id}"
+            f"&hfGT=R%7C"
+        )
+        pitcher_types = [
+            ("P_Strikeouts", "hfAB=strikeout%7C"),
+            ("P_K End of Inning", "hfAB=strikeout%7C&hfOuts=2%7C"),
+            ("P_100+ MPH", "metric_1=api_p_release_speed&metric_1_gt=100"),
+            ("P_12in+ Vertical Break", "metric_1=api_p_induced_break_z&metric_1_gt=12"),
+            ("P_12in+ Horizontal Break", "metric_1=api_p_break_x_arm&metric_1_gt=12"),
+            ("P_Home Runs Allowed", "hfAB=home_run%7C"),
+            ("P_RBIs Allowed", "hfAB=single%7Cdouble%7Ctriple%7Chome_run%7Csac_fly%7C"),
+        ]
+
+        for label, extra_params in pitcher_types:
+            for season_label, seasons_str in season_combos:
+                key = f"{label}_{season_label}"
+                savant_urls[key] = f"{pitcher_base}&hfSea={seasons_str}&{extra_params}"
+
         results.append({
             "mlb_id": mlb_id,
             "name": full_name,
