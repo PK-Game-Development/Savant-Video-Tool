@@ -712,9 +712,18 @@ function trackProgress(jobId) {
                 const msg = `Done! ${job.completed} clips processed. Click "Save" to download.`;
                 showStatus(msg, 'success');
             } else {
-                progCurrent.textContent = 'Complete!';
-                const msg = `Done: ${job.completed} downloaded, ${job.failed} failed.`;
-                showStatus(msg, job.failed > 0 ? 'info' : 'success');
+                // Check if combine/zip failed
+                const combineResult = job.results.find(r =>
+                    r.filename === 'combined_video.mp4' || r.filename === 'savant_videos.zip');
+                if (combineResult && combineResult.status === 'failed') {
+                    progCurrent.textContent = 'Combine failed.';
+                    const errDetail = combineResult.error || 'Unknown error';
+                    showStatus(`Videos downloaded but combining failed: ${errDetail}`, 'error');
+                } else {
+                    progCurrent.textContent = 'Complete!';
+                    const msg = `Done: ${job.completed} downloaded, ${job.failed} failed.`;
+                    showStatus(msg, job.failed > 0 ? 'info' : 'success');
+                }
             }
         }
     };
@@ -747,8 +756,16 @@ async function pollProgress(jobId) {
 
 function saveFile() {
     if (!currentJobId) return;
-    // Open the download URL directly — the server sends Content-Disposition: attachment
-    window.open('/api/download-file/' + currentJobId, '_blank');
+    // Use a hidden iframe to trigger the browser's native file download
+    // This avoids popup blockers and doesn't navigate away from the page
+    let iframe = document.getElementById('downloadIframe');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'downloadIframe';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+    }
+    iframe.src = '/api/download-file/' + currentJobId;
 }
 
 // Allow Enter key to trigger search

@@ -140,11 +140,24 @@ def try_download(game_pk, play_id, broadcast, output_path, session):
     return False
 
 
+def probe_has_audio(path):
+    """Check if a video file has an audio stream."""
+    cmd = [
+        "ffprobe", "-v", "quiet",
+        "-select_streams", "a",
+        "-show_entries", "stream=index",
+        "-of", "csv=p=0",
+        path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+    return bool(result.stdout.strip())
+
+
 def combine_videos(file_paths, output_path):
     """Combine multiple mp4 files into one using ffmpeg concat filter.
 
-    Re-encodes to handle clips with different resolutions/codecs/framerates,
-    which is common when mixing videos from different games or broadcasts.
+    Re-encodes to handle clips with different resolutions/codecs/framerates.
+    Generates silent audio for clips that have no audio track.
     """
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg is not installed on this server.")
@@ -154,11 +167,20 @@ def combine_videos(file_paths, output_path):
     filter_parts = []
     for i, path in enumerate(file_paths):
         inputs.extend(["-i", path])
+        has_audio = probe_has_audio(path)
+
         filter_parts.append(
             f"[{i}:v]scale=1280:720:force_original_aspect_ratio=decrease,"
             f"pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30[v{i}];"
         )
-        filter_parts.append(f"[{i}:a]aresample=48000[a{i}];")
+        if has_audio:
+            filter_parts.append(f"[{i}:a]aresample=48000[a{i}];")
+        else:
+            # Generate silent audio matching the video duration
+            filter_parts.append(
+                f"anullsrc=r=48000:cl=stereo[a{i}_null];"
+                f"[a{i}_null]atrim=duration=30[a{i}];"
+            )
 
     v_streams = "".join(f"[v{i}]" for i in range(len(file_paths)))
     a_streams = "".join(f"[a{i}]" for i in range(len(file_paths)))
