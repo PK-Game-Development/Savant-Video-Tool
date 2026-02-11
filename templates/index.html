@@ -1834,10 +1834,7 @@ function useUrl(btn) {
     const searchInput = document.getElementById('searchUrl');
     searchInput.value = url;
     searchInput.scrollIntoView({behavior: 'smooth', block: 'center'});
-    searchInput.style.borderColor = '#F5C842';
-    searchInput.focus();
-    setTimeout(() => { searchInput.style.borderColor = ''; }, 2000);
-    showStatus('URL loaded into search bar. Click "Search" to find videos.', 'info');
+    doSearch();
 }
 
 // --- Game Logs ---
