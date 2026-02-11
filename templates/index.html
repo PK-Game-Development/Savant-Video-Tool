@@ -988,17 +988,22 @@
                 <label class="combine-option"><input type="checkbox" class="game-type-cb" value="AS" onchange="updateSavantUrls()"><span>All Star</span></label>
             </div>
 
-            <h4 class="url-section-header">Batting Video Savant Clips</h4>
-            <div class="video-table-wrap"><table class="video-table">
-                <thead><tr><th>Hit Type</th><th style="width: 60px; text-align: center;">Link</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
-                <tbody id="hitTypeBody"></tbody>
-            </table></div>
-
-            <h4 class="url-section-header" style="margin-top: 16px;">Pitching Video Savant Clips</h4>
-            <div class="video-table-wrap"><table class="video-table">
-                <thead><tr><th>Category</th><th style="width: 60px; text-align: center;">Link</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
-                <tbody id="pitchTypeBody"></tbody>
-            </table></div>
+            <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 280px;">
+                    <h4 class="url-section-header">Batting Video Savant Clips</h4>
+                    <div class="video-table-wrap"><table class="video-table">
+                        <thead><tr><th>Hit Type</th><th style="width: 60px; text-align: center;">Link</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
+                        <tbody id="hitTypeBody"></tbody>
+                    </table></div>
+                </div>
+                <div style="flex: 1; min-width: 280px;">
+                    <h4 class="url-section-header">Pitching Video Savant Clips</h4>
+                    <div class="video-table-wrap"><table class="video-table">
+                        <thead><tr><th>Category</th><th style="width: 60px; text-align: center;">Link</th><th style="width: 120px; text-align: center;">Action</th></tr></thead>
+                        <tbody id="pitchTypeBody"></tbody>
+                    </table></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1042,12 +1047,14 @@
         <div class="video-table-wrap">
             <div class="table-scroll">
                 <table class="video-table">
-                    <thead>
+                    <thead id="videoTableHead">
                         <tr>
                             <th class="checkbox-cell"><input type="checkbox" id="checkAll" onchange="toggleAll(this)"></th>
                             <th>Player</th>
                             <th>Date</th>
                             <th>Result</th>
+                            <th>Vs</th>
+                            <th>Opp</th>
                             <th>Pitch</th>
                             <th>Velo</th>
                             <th>EV</th>
@@ -1157,6 +1164,7 @@
 
 <script>
 let videoData = [];
+let currentPlayerType = 'batter';
 let currentJobId = null;
 
 const BATTING_TYPES = [
@@ -1235,6 +1243,7 @@ async function doSearch() {
         }
 
         videoData = data.videos;
+        currentPlayerType = data.player_type || 'batter';
         renderTable(videoData);
 
         document.getElementById('resultsStats').textContent =
@@ -1257,11 +1266,35 @@ async function doSearch() {
 
 function renderTable(videos) {
     const tbody = document.getElementById('videoTableBody');
+    const thead = document.getElementById('videoTableHead');
     tbody.innerHTML = '';
+
+    const isBatter = currentPlayerType === 'batter';
+
+    // Update headers based on player type
+    thead.innerHTML = `<tr>
+        <th class="checkbox-cell"><input type="checkbox" id="checkAll" onchange="toggleAll(this)"></th>
+        <th>Player</th>
+        <th>Date</th>
+        <th>Result</th>
+        <th>${isBatter ? 'Pitcher' : 'Batter'}</th>
+        <th>Opp</th>
+        <th>Pitch</th>
+        <th>Velo</th>
+        <th>EV</th>
+        <th>LA</th>
+        <th>Preview</th>
+        <th class="status-cell">Status</th>
+    </tr>`;
 
     videos.forEach((v, i) => {
         const tr = document.createElement('tr');
         tr.id = 'row-' + i;
+
+        // Opposing player: for batter search show pitcher name, for pitcher search show batter name
+        const vsPlayer = isBatter ? (v.pitcher_name || '-') : (v.batter_name || '-');
+        // Opposing team: for batter search show pitching team, for pitcher search show batting team
+        const oppTeam = isBatter ? (v.pitching_team || '-') : (v.batting_team || '-');
 
         tr.innerHTML = `
             <td class="checkbox-cell">
@@ -1270,6 +1303,8 @@ function renderTable(videos) {
             <td class="player">${esc(v.player)}</td>
             <td class="date">${esc(v.date)}</td>
             <td class="event">${esc(v.event || '-')}</td>
+            <td class="stat">${esc(vsPlayer)}</td>
+            <td class="stat">${esc(oppTeam)}</td>
             <td class="stat">${esc(v.pitch_type || '-')}</td>
             <td class="stat">${v.release_speed ? esc(v.release_speed) + ' mph' : '-'}</td>
             <td class="stat">${v.launch_speed ? esc(v.launch_speed) + ' mph' : '-'}</td>

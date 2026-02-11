@@ -127,15 +127,20 @@ def fetch_game_play_ids(game_pk, session):
     resp.raise_for_status()
     data = resp.json()
     play_id_map = {}
+    matchup_map = {}
     all_plays = data.get("liveData", {}).get("plays", {}).get("allPlays", [])
     for play in all_plays:
         ab_number = play.get("atBatIndex", -1) + 1
+        matchup = play.get("matchup", {})
+        batter_name = matchup.get("batter", {}).get("fullName", "")
+        pitcher_name = matchup.get("pitcher", {}).get("fullName", "")
+        matchup_map[ab_number] = (batter_name, pitcher_name)
         for event in play.get("playEvents", []):
             play_id = event.get("playId", "")
             pitch_num = event.get("pitchNumber")
             if play_id and pitch_num is not None:
                 play_id_map[(ab_number, pitch_num)] = play_id
-    return play_id_map
+    return play_id_map, matchup_map
 
 
 def sanitize_filename(name):
@@ -418,11 +423,15 @@ def api_search():
             games[gp].append(row)
 
     game_play_maps = {}
+    game_matchup_maps = {}
     for game_pk in games:
         try:
-            game_play_maps[game_pk] = fetch_game_play_ids(game_pk, session)
+            play_map, matchup_map = fetch_game_play_ids(game_pk, session)
+            game_play_maps[game_pk] = play_map
+            game_matchup_maps[game_pk] = matchup_map
         except Exception:
             game_play_maps[game_pk] = {}
+            game_matchup_maps[game_pk] = {}
         time.sleep(0.2)
 
     # Resolve play IDs
@@ -441,6 +450,25 @@ def api_search():
 
         filename = build_filename(row)
 
+        # Determine opposing team from inning_topbot
+        home = row.get("home_team", "")
+        away = row.get("away_team", "")
+        topbot = row.get("inning_topbot", "")
+        if topbot == "Top":
+            batting_team = away
+            pitching_team = home
+        elif topbot == "Bot":
+            batting_team = home
+            pitching_team = away
+        else:
+            batting_team = ""
+            pitching_team = ""
+
+        # Get batter/pitcher names from game feed matchup data
+        matchup = game_matchup_maps.get(game_pk, {}).get(ab_num, ("", ""))
+        batter_name = matchup[0]
+        pitcher_name = matchup[1]
+
         videos.append({
             "player": row.get("player_name", "Unknown"),
             "date": row.get("game_date", ""),
@@ -450,16 +478,26 @@ def api_search():
             "release_speed": row.get("release_speed", ""),
             "launch_speed": row.get("launch_speed", ""),
             "launch_angle": row.get("launch_angle", ""),
+            "batting_team": batting_team,
+            "pitching_team": pitching_team,
+            "batter_name": batter_name,
+            "pitcher_name": pitcher_name,
             "game_pk": game_pk,
             "play_id": play_id,
             "filename": filename,
             "savant_url": SPORTY_VIDEO_URL.format(play_id=play_id),
         })
 
+    # Detect player_type from URL
+    player_type = "batter"
+    if "player_type=pitcher" in url:
+        player_type = "pitcher"
+
     return jsonify({
         "total_pitches": total_found,
         "videos_resolved": len(videos),
         "games": len(games),
+        "player_type": player_type,
         "videos": videos,
     })
 

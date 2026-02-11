@@ -77,9 +77,11 @@ def fetch_search_results(search_url, session):
 
 def fetch_game_play_ids(game_pk, session):
     """
-    Fetch play IDs from the MLB Stats API for a given game.
+    Fetch play IDs and matchup names from the MLB Stats API for a given game.
 
-    Returns dict mapping (at_bat_number, pitch_number) -> play_id.
+    Returns tuple of:
+      - play_id_map: dict mapping (at_bat_number, pitch_number) -> play_id
+      - matchup_map: dict mapping at_bat_number -> (batter_name, pitcher_name)
     at_bat_number is 1-based to match the Statcast CSV format.
     """
     url = MLB_GAME_FEED_URL.format(game_pk=game_pk)
@@ -88,11 +90,17 @@ def fetch_game_play_ids(game_pk, session):
     data = resp.json()
 
     play_id_map = {}
+    matchup_map = {}
     all_plays = data.get("liveData", {}).get("plays", {}).get("allPlays", [])
 
     for play in all_plays:
         # atBatIndex is 0-based in the API; CSV at_bat_number is 1-based
         ab_number = play.get("atBatIndex", -1) + 1
+
+        matchup = play.get("matchup", {})
+        batter_name = matchup.get("batter", {}).get("fullName", "")
+        pitcher_name = matchup.get("pitcher", {}).get("fullName", "")
+        matchup_map[ab_number] = (batter_name, pitcher_name)
 
         for event in play.get("playEvents", []):
             play_id = event.get("playId", "")
@@ -100,7 +108,7 @@ def fetch_game_play_ids(game_pk, session):
             if play_id and pitch_num is not None:
                 play_id_map[(ab_number, pitch_num)] = play_id
 
-    return play_id_map
+    return play_id_map, matchup_map
 
 
 def sanitize_filename(name):
@@ -297,7 +305,7 @@ def main():
     game_play_maps = {}
     for i, game_pk in enumerate(games, 1):
         try:
-            play_map = fetch_game_play_ids(game_pk, session)
+            play_map, _matchup_map = fetch_game_play_ids(game_pk, session)
             game_play_maps[game_pk] = play_map
             print(f"  [{i}/{len(games)}] Game {game_pk}: {len(play_map)} pitch events")
         except Exception as e:
