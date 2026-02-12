@@ -1676,6 +1676,15 @@ function selectSuggestion(index) {
     playerInput.value = player.name;
     hideSuggestions();
 
+    // Clear previous video results
+    videoData = [];
+    currentJobId = null;
+    document.getElementById('resultsSection').classList.remove('show');
+    document.getElementById('progressSection').classList.remove('show');
+    document.getElementById('saveBtn').classList.remove('show');
+    document.getElementById('searchUrl').value = '';
+    document.getElementById('savantUrlBuilder').style.display = 'none';
+
     // Use the suggest data directly — no second API call
     playerSearchResults = suggestResults;
     selectedPlayerIndex = index;
