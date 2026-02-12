@@ -263,6 +263,17 @@
         .btn-save:hover:not(:disabled) { background: #7AD0EC; }
         .btn-save.show { display: inline-block; }
 
+        .btn-discard {
+            background: #E67A8A;
+            color: #0B1026;
+            padding: 14px 32px;
+            font-size: 16px;
+            display: none;
+            margin-left: 12px;
+        }
+        .btn-discard:hover:not(:disabled) { background: #F09BA7; }
+        .btn-discard.show { display: inline-block; }
+
         .combine-option {
             display: flex;
             align-items: center;
@@ -990,6 +1001,7 @@
         </div>
         <div class="progress-actions">
             <button class="btn btn-save" id="saveBtn" onclick="saveFile()">Save to Computer</button>
+            <button class="btn btn-discard" id="discardBtn" onclick="discardJob()">Discard Files</button>
         </div>
     </div>
 
@@ -1248,6 +1260,7 @@ async function doSearch() {
     document.getElementById('resultsSection').classList.remove('show');
     document.getElementById('progressSection').classList.remove('show');
     document.getElementById('saveBtn').classList.remove('show');
+    document.getElementById('discardBtn').classList.remove('show');
 
     try {
         const resp = await fetch('/api/search', {
@@ -1410,6 +1423,7 @@ async function doDownload() {
 
     hideStatus();
     document.getElementById('saveBtn').classList.remove('show');
+    document.getElementById('discardBtn').classList.remove('show');
 
     // Mark selected rows as queued
     document.querySelectorAll('.vid-check:checked').forEach(cb => {
@@ -1523,6 +1537,7 @@ function trackProgress(jobId) {
                 const saveBtn = document.getElementById('saveBtn');
                 saveBtn.textContent = isCombined ? 'Save Video to Computer' : 'Save Zip to Computer';
                 saveBtn.classList.add('show');
+                document.getElementById('discardBtn').classList.add('show');
 
                 const msg = `Done! ${job.completed} clips processed. Click "Save" to download.`;
                 showStatus(msg, 'success');
@@ -1571,6 +1586,7 @@ async function pollProgress(jobId) {
         if (job.status === 'done') {
             if (job.download_ready && job.download_file) {
                 document.getElementById('saveBtn').classList.add('show');
+                document.getElementById('discardBtn').classList.add('show');
                 showStatus('Ready! Click "Save" to download your file.', 'success');
             } else {
                 showStatus(`Done: ${job.completed} downloaded, ${job.failed} failed.`, 'success');
@@ -1595,6 +1611,16 @@ function saveFile() {
         document.body.appendChild(iframe);
     }
     iframe.src = '/api/download-file/' + currentJobId;
+}
+
+function discardJob() {
+    if (!currentJobId) return;
+    fetch('/api/job/' + currentJobId, { method: 'DELETE' });
+    currentJobId = null;
+    document.getElementById('saveBtn').classList.remove('show');
+    document.getElementById('discardBtn').classList.remove('show');
+    document.getElementById('progressCurrent').textContent = 'Files discarded.';
+    showStatus('Server files cleaned up.', 'success');
 }
 
 // Allow Enter key to trigger search
@@ -1698,6 +1724,7 @@ function selectSuggestion(index) {
     document.getElementById('resultsSection').classList.remove('show');
     document.getElementById('progressSection').classList.remove('show');
     document.getElementById('saveBtn').classList.remove('show');
+    document.getElementById('discardBtn').classList.remove('show');
     document.getElementById('searchUrl').value = '';
     document.getElementById('savantUrlBuilder').style.display = 'none';
 
@@ -1763,6 +1790,7 @@ async function doPlayerSearch() {
     document.getElementById('resultsSection').classList.remove('show');
     document.getElementById('progressSection').classList.remove('show');
     document.getElementById('saveBtn').classList.remove('show');
+    document.getElementById('discardBtn').classList.remove('show');
     document.getElementById('searchUrl').value = '';
     document.getElementById('savantUrlBuilder').style.display = 'none';
 

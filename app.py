@@ -81,7 +81,7 @@ WORK_DIR = os.path.join(tempfile.gettempdir(), "savant_jobs")
 os.makedirs(WORK_DIR, exist_ok=True)
 
 # How long to keep job files before cleanup (seconds)
-JOB_TTL = 3600  # 1 hour
+JOB_TTL = 1800  # 30 minutes
 
 # Active jobs: job_id -> job state dict
 jobs = {}
@@ -763,6 +763,16 @@ def api_download_file(job_id):
         as_attachment=True,
         download_name=filename,
     )
+
+
+@app.route("/api/job/<job_id>", methods=["DELETE"])
+def api_cleanup_job(job_id):
+    """Delete a job's temp files and free memory."""
+    job_dir = get_job_dir(job_id)
+    if os.path.isdir(job_dir):
+        shutil.rmtree(job_dir, ignore_errors=True)
+    jobs.pop(job_id, None)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/game-log", methods=["POST"])
