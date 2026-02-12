@@ -9,14 +9,14 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #0B1026;
-            color: #e0e0e0;
+            background: #0a0a0a;
+            color: #d0d0d0;
             min-height: 100vh;
         }
 
         .header {
-            background: linear-gradient(135deg, #111A33, #0B1026);
-            border-bottom: 3px solid #F5C842;
+            background: linear-gradient(135deg, #141414, #0a0a0a);
+            border-bottom: 3px solid #fff;
             padding: 20px 0;
             text-align: center;
         }
@@ -27,37 +27,37 @@
             letter-spacing: 1px;
         }
 
-        .header h1 span { color: #F5C842; }
+        .header h1 span { color: #fff; }
 
         .header p {
-            color: #7888AA;
+            color: #888;
             font-size: 14px;
             margin-top: 4px;
         }
 
         .header .header-support {
-            color: #7888AA;
+            color: #888;
             font-size: 13px;
             margin-top: 6px;
         }
 
         .header .header-support a {
-            color: #7AD4F0;
+            color: #fff;
             text-decoration: underline;
         }
 
         .header .header-support a:hover {
-            color: #9AE0F8;
+            color: #ccc;
         }
 
         .footer-credit {
             font-size: 11px;
             line-height: 1.5;
-            color: #7888AA;
+            color: #888;
             text-align: center;
             margin-bottom: 12px;
             padding-bottom: 12px;
-            border-bottom: 1px solid #1A2844;
+            border-bottom: 1px solid #2a2a2a;
         }
 
         .footer-credit .footer-logo {
@@ -68,12 +68,12 @@
         }
 
         .footer-credit a {
-            color: #7AD4F0;
+            color: #fff;
             text-decoration: underline;
         }
 
         .footer-credit a:hover {
-            color: #9AE0F8;
+            color: #ccc;
         }
 
         .container {
@@ -84,7 +84,7 @@
 
         /* Search Section */
         .search-section {
-            background: #111A33;
+            background: #141414;
             border-radius: 8px;
             padding: 24px;
             margin-bottom: 20px;
@@ -99,9 +99,9 @@
         .search-row input[type="text"] {
             flex: 1;
             padding: 12px 16px;
-            border: 2px solid #1A2844;
+            border: 2px solid #2a2a2a;
             border-radius: 6px;
-            background: #0B1026;
+            background: #0a0a0a;
             color: #fff;
             font-size: 14px;
             outline: none;
@@ -109,11 +109,11 @@
         }
 
         .search-row input[type="text"]:focus {
-            border-color: #F5C842;
+            border-color: #fff;
         }
 
         .search-row input[type="text"]::placeholder {
-            color: #4A5A7A;
+            color: #555;
         }
 
         /* Autocomplete */
@@ -132,9 +132,9 @@
             top: 100%;
             left: 0;
             right: 0;
-            background: #0B1026;
-            border: 2px solid #F5C842;
-            border-top: 1px solid #1A2844;
+            background: #0a0a0a;
+            border: 2px solid #fff;
+            border-top: 1px solid #2a2a2a;
             border-radius: 0 0 8px 8px;
             max-height: 340px;
             overflow-y: auto;
@@ -152,7 +152,7 @@
             padding: 10px 14px;
             cursor: pointer;
             gap: 12px;
-            border-bottom: 1px solid #1A2844;
+            border-bottom: 1px solid #2a2a2a;
             transition: background 0.1s;
         }
 
@@ -162,7 +162,7 @@
 
         .suggestion-item:hover,
         .suggestion-item.active {
-            background: #1A2844;
+            background: #1e1e1e;
         }
 
         .suggestion-item img {
@@ -170,7 +170,7 @@
             height: 40px;
             border-radius: 50%;
             object-fit: cover;
-            background: #1A2844;
+            background: #1e1e1e;
             flex-shrink: 0;
         }
 
@@ -181,13 +181,13 @@
         }
 
         .suggestion-meta {
-            color: #7888AA;
+            color: #888;
             font-size: 12px;
             margin-top: 1px;
         }
 
         .suggestion-inactive {
-            color: #E67A8A;
+            color: #cc6666;
             font-size: 11px;
             font-style: italic;
         }
@@ -207,15 +207,15 @@
 
         .option-group label {
             font-size: 13px;
-            color: #7888AA;
+            color: #888;
         }
 
         .option-group select,
         .option-group input[type="number"] {
             padding: 8px 12px;
-            border: 2px solid #1A2844;
+            border: 2px solid #2a2a2a;
             border-radius: 6px;
-            background: #0B1026;
+            background: #0a0a0a;
             color: #fff;
             font-size: 13px;
             outline: none;
@@ -239,39 +239,39 @@
         }
 
         .btn-search {
-            background: #F5C842;
-            color: #0B1026;
+            background: #fff;
+            color: #000;
         }
 
-        .btn-search:hover:not(:disabled) { background: #F7D35A; }
+        .btn-search:hover:not(:disabled) { background: #d0d0d0; }
 
         .btn-download {
-            background: #F5C842;
-            color: #0B1026;
+            background: #fff;
+            color: #000;
         }
 
-        .btn-download:hover:not(:disabled) { background: #F7D35A; }
+        .btn-download:hover:not(:disabled) { background: #d0d0d0; }
 
         .btn-save {
-            background: #5EC4E6;
-            color: #0B1026;
+            background: #fff;
+            color: #000;
             padding: 14px 32px;
             font-size: 16px;
             display: none;
         }
 
-        .btn-save:hover:not(:disabled) { background: #7AD0EC; }
+        .btn-save:hover:not(:disabled) { background: #d0d0d0; }
         .btn-save.show { display: inline-block; }
 
         .btn-discard {
-            background: #E67A8A;
-            color: #0B1026;
+            background: #555;
+            color: #fff;
             padding: 14px 32px;
             font-size: 16px;
             display: none;
             margin-left: 12px;
         }
-        .btn-discard:hover:not(:disabled) { background: #F09BA7; }
+        .btn-discard:hover:not(:disabled) { background: #666; }
         .btn-discard.show { display: inline-block; }
 
         .combine-option {
@@ -280,16 +280,16 @@
             gap: 6px;
             cursor: pointer;
             font-size: 13px;
-            color: #F5C842;
-            background: #1A2844;
-            border: 1px solid #2A3855;
+            color: #fff;
+            background: #1e1e1e;
+            border: 1px solid #3a3a3a;
             border-radius: 6px;
             padding: 8px 14px;
             user-select: none;
             transition: border-color 0.2s;
         }
 
-        .combine-option:hover { border-color: #F5C842; }
+        .combine-option:hover { border-color: #fff; }
 
         .combine-option.disabled {
             opacity: 0.45;
@@ -305,21 +305,21 @@
 
         .combine-option input[type="checkbox"],
         .combine-option input[type="radio"] {
-            accent-color: #F5C842;
+            accent-color: #fff;
         }
 
         .btn-select {
-            background: #1A2844;
+            background: #2a2a2a;
             color: #ccc;
             padding: 8px 16px;
             font-size: 13px;
         }
 
-        .btn-select:hover:not(:disabled) { background: #2A3855; }
+        .btn-select:hover:not(:disabled) { background: #3a3a3a; }
 
         /* Player Search */
         .player-search-section {
-            background: #111A33;
+            background: #141414;
             border-radius: 8px;
             padding: 24px;
             margin-bottom: 20px;
@@ -327,30 +327,30 @@
 
         .player-link-btn {
             padding: 6px 14px;
-            border: 1px solid #2A3855;
+            border: 1px solid #3a3a3a;
             border-radius: 4px;
-            background: #1A2844;
-            color: #7AD4F0;
+            background: #1e1e1e;
+            color: #fff;
             font-size: 12px;
             font-weight: 600;
-            text-decoration: none;
+            text-decoration: underline;
             cursor: pointer;
             transition: all 0.2s;
             display: inline-block;
         }
 
         .player-link-btn:hover {
-            background: #2A3855;
-            border-color: #5EC4E6;
+            background: #3a3a3a;
+            border-color: #fff;
             color: #fff;
         }
 
         .player-card {
             margin-top: 16px;
             padding: 16px;
-            background: #0B1026;
+            background: #0a0a0a;
             border-radius: 6px;
-            border: 1px solid #1A2844;
+            border: 1px solid #2a2a2a;
         }
 
         .player-info-layout {
@@ -364,7 +364,7 @@
             height: 110px;
             border-radius: 8px;
             object-fit: cover;
-            background: #1A2844;
+            background: #1e1e1e;
             flex-shrink: 0;
         }
 
@@ -381,13 +381,13 @@
         }
 
         .player-info-text .player-meta {
-            color: #7888AA;
+            color: #888;
             font-size: 14px;
             margin-bottom: 4px;
         }
 
         .player-info-text .player-inactive {
-            color: #E67A8A;
+            color: #cc6666;
             font-size: 13px;
         }
 
@@ -406,7 +406,7 @@
         }
 
         .url-section-header {
-            color: #F5C842;
+            color: #fff;
             margin: 16px 0 8px 0;
             font-size: 24px;
             font-weight: 700;
@@ -423,9 +423,9 @@
         }
 
         .status.show { display: block; }
-        .status.info { background: #0E1A30; border: 1px solid #1A2844; color: #5EC4E6; }
-        .status.error { background: #1A0E1A; border: 1px solid #3A1A2A; color: #E67A8A; }
-        .status.success { background: #1A2A10; border: 1px solid #2A3A1A; color: #F5C842; }
+        .status.info { background: #111; border: 1px solid #2a2a2a; color: #ccc; }
+        .status.error { background: #1a1111; border: 1px solid #3a2a2a; color: #cc6666; }
+        .status.success { background: #111; border: 1px solid #2a2a2a; color: #fff; }
 
         /* Results Section */
         .results-section {
@@ -445,11 +445,11 @@
 
         .results-header h2 {
             font-size: 18px;
-            color: #F5C842;
+            color: #fff;
         }
 
         .results-header .stats {
-            color: #7888AA;
+            color: #888;
             font-size: 13px;
         }
 
@@ -461,7 +461,7 @@
 
         /* Video Table */
         .video-table-wrap {
-            background: #111A33;
+            background: #141414;
             border-radius: 8px;
             overflow: hidden;
         }
@@ -472,8 +472,8 @@
         }
 
         .video-table th {
-            background: #1A2844;
-            color: #7888AA;
+            background: #1e1e1e;
+            color: #888;
             font-size: 12px;
             font-weight: 600;
             text-transform: uppercase;
@@ -487,14 +487,14 @@
         .video-table td {
             padding: 10px 12px;
             font-size: 13px;
-            border-top: 1px solid #1A2844;
+            border-top: 1px solid #2a2a2a;
         }
 
-        .video-table tr:hover { background: #152038; }
+        .video-table tr:hover { background: #1a1a1a; }
 
-        .video-table .player { font-weight: 600; color: #F5C842; }
-        .video-table .event { color: #5EC4E6; }
-        .video-table .date { color: #7888AA; }
+        .video-table .player { font-weight: 600; color: #fff; }
+        .video-table .event { color: #ccc; }
+        .video-table .date { color: #888; }
         .video-table .stat { color: #aaa; font-variant-numeric: tabular-nums; }
 
         .video-table .status-cell {
@@ -510,24 +510,24 @@
             font-weight: 600;
         }
 
-        .badge-ready { background: #1A2844; color: #7888AA; }
-        .badge-downloading { background: #0E1A30; color: #5EC4E6; }
-        .badge-done { background: #1A2A10; color: #F5C842; }
-        .badge-failed { background: #1A0E1A; color: #E67A8A; }
-        .badge-skipped { background: #1A1A0E; color: #F5C842; }
+        .badge-ready { background: #2a2a2a; color: #888; }
+        .badge-downloading { background: #111; color: #ccc; }
+        .badge-done { background: #1a1a1a; color: #fff; }
+        .badge-failed { background: #1a1111; color: #cc6666; }
+        .badge-skipped { background: #1a1a1a; color: #999; }
 
         .checkbox-cell { width: 40px; text-align: center; }
 
         input[type="checkbox"] {
             width: 16px;
             height: 16px;
-            accent-color: #F5C842;
+            accent-color: #fff;
             cursor: pointer;
         }
 
         /* Progress Section */
         .progress-section {
-            background: #111A33;
+            background: #141414;
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
@@ -537,7 +537,7 @@
         .progress-section.show { display: block; }
 
         .progress-bar-wrap {
-            background: #0B1026;
+            background: #0a0a0a;
             border-radius: 4px;
             height: 24px;
             overflow: hidden;
@@ -545,7 +545,7 @@
         }
 
         .progress-bar {
-            background: linear-gradient(90deg, #F5C842, #F7D35A);
+            background: linear-gradient(90deg, #fff, #d0d0d0);
             height: 100%;
             width: 0%;
             transition: width 0.3s ease;
@@ -556,7 +556,7 @@
             display: flex;
             justify-content: space-between;
             font-size: 13px;
-            color: #7888AA;
+            color: #888;
         }
 
         .progress-current {
@@ -572,12 +572,12 @@
 
         /* Preview Link */
         a.preview-link {
-            color: #7AD4F0;
+            color: #fff;
             text-decoration: underline;
             font-size: 12px;
         }
 
-        a.preview-link:hover { color: #9AE0F8; }
+        a.preview-link:hover { color: #ccc; }
 
         /* Scrollable table */
         .table-scroll {
@@ -586,9 +586,9 @@
         }
 
         .table-scroll::-webkit-scrollbar { width: 8px; }
-        .table-scroll::-webkit-scrollbar-track { background: #111A33; }
+        .table-scroll::-webkit-scrollbar-track { background: #141414; }
         .table-scroll::-webkit-scrollbar-thumb {
-            background: #2A3855;
+            background: #3a3a3a;
             border-radius: 4px;
         }
 
@@ -597,8 +597,8 @@
             display: inline-block;
             width: 16px;
             height: 16px;
-            border: 2px solid #2A3855;
-            border-top-color: #F5C842;
+            border: 2px solid #333;
+            border-top-color: #fff;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             vertical-align: middle;
@@ -620,16 +620,16 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: #152038;
-            border: 1px solid #2A3855;
-            border-left: 3px solid #F5C842;
+            background: #1a1a1a;
+            border: 1px solid #3a3a3a;
+            border-left: 3px solid #fff;
             border-radius: 8px;
             padding: 14px 20px;
             cursor: pointer;
             transition: all 0.2s;
         }
 
-        .game-log-toggle:hover { border-color: #F5C842; background: #1A2844; }
+        .game-log-toggle:hover { border-color: #fff; background: #222; }
 
         .game-log-toggle .toggle-left {
             display: flex;
@@ -638,13 +638,13 @@
         }
 
         .game-log-toggle .toggle-left span {
-            color: #F5C842;
+            color: #fff;
             font-size: 16px;
             font-weight: 700;
         }
 
         .game-log-toggle .toggle-arrow {
-            color: #F5C842;
+            color: #fff;
             font-size: 14px;
             transition: transform 0.2s;
         }
@@ -654,8 +654,8 @@
 
         .game-log-body {
             display: none;
-            background: #111A33;
-            border: 1px solid #1A2844;
+            background: #141414;
+            border: 1px solid #2a2a2a;
             border-top: none;
             border-radius: 0 0 8px 8px;
             padding: 16px;
@@ -673,29 +673,29 @@
 
         .game-log-controls select {
             padding: 8px 12px;
-            border: 2px solid #1A2844;
+            border: 2px solid #2a2a2a;
             border-radius: 6px;
-            background: #0B1026;
+            background: #0a0a0a;
             color: #fff;
             font-size: 13px;
             outline: none;
         }
 
-        .game-log-controls select:focus { border-color: #F5C842; }
+        .game-log-controls select:focus { border-color: #fff; }
 
         .game-log-controls .btn-fetch-log {
             padding: 8px 18px;
             border: none;
             border-radius: 6px;
-            background: #F5C842;
-            color: #0B1026;
+            background: #fff;
+            color: #000;
             font-size: 13px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.2s;
         }
 
-        .game-log-controls .btn-fetch-log:hover:not(:disabled) { background: #F7D35A; }
+        .game-log-controls .btn-fetch-log:hover:not(:disabled) { background: #d0d0d0; }
         .game-log-controls .btn-fetch-log:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .game-log-scroll {
@@ -705,8 +705,8 @@
         }
 
         .game-log-scroll::-webkit-scrollbar { width: 8px; }
-        .game-log-scroll::-webkit-scrollbar-track { background: #0B1026; }
-        .game-log-scroll::-webkit-scrollbar-thumb { background: #2A3855; border-radius: 4px; }
+        .game-log-scroll::-webkit-scrollbar-track { background: #0a0a0a; }
+        .game-log-scroll::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 4px; }
 
         .game-log-table {
             width: 100%;
@@ -715,8 +715,8 @@
         }
 
         .game-log-table th {
-            background: #1A2844;
-            color: #7888AA;
+            background: #1e1e1e;
+            color: #888;
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
@@ -731,21 +731,21 @@
 
         .game-log-table td {
             padding: 7px 10px;
-            border-top: 1px solid #1A2844;
+            border-top: 1px solid #2a2a2a;
             text-align: center;
             color: #ccc;
             font-variant-numeric: tabular-nums;
             white-space: nowrap;
         }
 
-        .game-log-table tr:hover { background: #152038; }
+        .game-log-table tr:hover { background: #1a1a1a; }
 
-        .game-log-table .col-date { text-align: left; color: #7888AA; }
-        .game-log-table .col-opp { text-align: left; color: #5EC4E6; font-weight: 600; }
-        .game-log-table .col-highlight { color: #F5C842; font-weight: 600; }
+        .game-log-table .col-date { text-align: left; color: #888; }
+        .game-log-table .col-opp { text-align: left; color: #ccc; font-weight: 600; }
+        .game-log-table .col-highlight { color: #fff; font-weight: 600; }
 
         .game-log-empty {
-            color: #7888AA;
+            color: #888;
             text-align: center;
             padding: 24px;
             font-size: 13px;
@@ -773,26 +773,26 @@
             top: 24px;
             max-height: calc(100vh - 48px);
             overflow-y: auto;
-            background: #111A33;
+            background: #141414;
             border-radius: 8px;
-            border: 1px solid #1A2844;
+            border: 1px solid #2a2a2a;
             padding: 20px;
         }
 
         .sidebar-guide::-webkit-scrollbar { width: 6px; }
-        .sidebar-guide::-webkit-scrollbar-track { background: #111A33; border-radius: 0 8px 8px 0; }
-        .sidebar-guide::-webkit-scrollbar-thumb { background: #2A3855; border-radius: 3px; }
+        .sidebar-guide::-webkit-scrollbar-track { background: #141414; border-radius: 0 8px 8px 0; }
+        .sidebar-guide::-webkit-scrollbar-thumb { background: #3a3a3a; border-radius: 3px; }
 
         .sidebar-guide h3 {
-            color: #F5C842;
+            color: #fff;
             font-size: 16px;
             margin: 0 0 12px 0;
             padding-bottom: 8px;
-            border-bottom: 1px solid #1A2844;
+            border-bottom: 1px solid #2a2a2a;
         }
 
         .sidebar-guide h4 {
-            color: #F5C842;
+            color: #fff;
             font-size: 13px;
             font-weight: 700;
             margin: 14px 0 6px 0;
@@ -804,7 +804,7 @@
 
         .sidebar-guide p,
         .sidebar-guide li {
-            color: #9AA8C0;
+            color: #999;
             font-size: 12px;
             line-height: 1.6;
         }
@@ -824,23 +824,23 @@
         }
 
         .sidebar-guide .guide-tip {
-            background: #0B1026;
-            border-left: 3px solid #F5C842;
+            background: #0a0a0a;
+            border-left: 3px solid #fff;
             padding: 8px 10px;
             border-radius: 0 4px 4px 0;
             margin: 10px 0;
             font-size: 12px;
-            color: #9AA8C0;
+            color: #999;
         }
 
         .sidebar-guide .guide-tip strong {
-            color: #F5C842;
+            color: #fff;
         }
 
         .sidebar-guide .key {
             display: inline-block;
-            background: #1A2844;
-            color: #5EC4E6;
+            background: #2a2a2a;
+            color: #ccc;
             padding: 1px 6px;
             border-radius: 3px;
             font-size: 11px;
@@ -853,18 +853,18 @@
             justify-content: space-between;
             background: none;
             border: none;
-            border-bottom: 1px solid #1A2844;
+            border-bottom: 1px solid #2a2a2a;
             width: 100%;
             padding: 0 0 8px 0;
             margin: 0 0 12px 0;
             cursor: pointer;
-            color: #F5C842;
+            color: #fff;
             font-size: 16px;
             font-weight: 700;
             font-family: inherit;
         }
 
-        .sidebar-toggle:hover { color: #F7D35A; }
+        .sidebar-toggle:hover { color: #ccc; }
 
         .sidebar-toggle .sidebar-arrow {
             font-size: 12px;
@@ -910,7 +910,7 @@
 
     <!-- Player Search -->
     <div class="player-search-section">
-        <h3 style="color: #F5C842; margin: 0 0 16px 0; font-size: 24px; text-decoration: underline;">Player Search</h3>
+        <h3 style="color: #fff; margin: 0 0 16px 0; font-size: 24px; text-decoration: underline;">Player Search</h3>
         <div class="search-row">
             <div class="search-input-wrapper">
                 <input type="text" id="playerName"
@@ -946,11 +946,11 @@
         </div>
 
         <!-- Savant URL Builder (populated by JS after player search) -->
-        <div id="savantUrlBuilder" style="display: none; margin-top: 20px; border-top: 1px solid #1A2844; padding-top: 16px;">
-            <h4 style="color: #F5C842; margin: 0 0 12px 0; font-size: 16px;">Select Season(s)</h4>
+        <div id="savantUrlBuilder" style="display: none; margin-top: 20px; border-top: 1px solid #2a2a2a; padding-top: 16px;">
+            <h4 style="color: #fff; margin: 0 0 12px 0; font-size: 16px;">Select Season(s)</h4>
             <div id="seasonCheckboxes" style="display: flex; flex-wrap: nowrap; gap: 6px; margin-bottom: 16px;"></div>
 
-            <h4 style="color: #F5C842; margin: 0 0 12px 0; font-size: 16px;">Game Type</h4>
+            <h4 style="color: #fff; margin: 0 0 12px 0; font-size: 16px;">Game Type</h4>
             <div id="gameTypeCheckboxes" style="display: flex; flex-wrap: nowrap; gap: 6px; margin-bottom: 16px;">
                 <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="R" checked onchange="updateBuiltUrl()"><span>Regular</span></label>
                 <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="PO" onchange="updateBuiltUrl()"><span>Postseason</span></label>
@@ -962,21 +962,21 @@
                 <label class="combine-option compact"><input type="checkbox" class="game-type-cb" value="AS" onchange="updateBuiltUrl()"><span>All Star</span></label>
             </div>
 
-            <h4 style="color: #F5C842; margin: 0 0 12px 0; font-size: 16px;">Player Type</h4>
+            <h4 style="color: #fff; margin: 0 0 12px 0; font-size: 16px;">Player Type</h4>
             <div style="display: flex; gap: 6px; margin-bottom: 16px;">
                 <label class="combine-option compact"><input type="radio" name="urlPlayerType" value="batter" checked onchange="togglePlayerType()"><span>Batting</span></label>
                 <label class="combine-option compact"><input type="radio" name="urlPlayerType" value="pitcher" onchange="togglePlayerType()"><span>Pitching</span></label>
             </div>
 
             <div id="battingOptions">
-                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">PA Results</h4>
+                <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 16px;">PA Results</h4>
                 <div id="battingPaCheckboxes" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
             </div>
 
             <div id="pitchingOptions" style="display: none;">
-                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">PA Results</h4>
+                <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 16px;">PA Results</h4>
                 <div id="pitchingPaCheckboxes" style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px;"></div>
-                <h4 style="color: #F5C842; margin: 0 0 8px 0; font-size: 16px;">Pitch Metric Filter <span style="color: #7888AA; font-weight: 400; font-size: 12px;">(optional)</span></h4>
+                <h4 style="color: #fff; margin: 0 0 8px 0; font-size: 16px;">Pitch Metric Filter <span style="color: #888; font-weight: 400; font-size: 12px;">(optional)</span></h4>
                 <div style="display: flex; flex-wrap: wrap; gap: 6px;">
                     <label class="combine-option compact"><input type="radio" name="pitchMetric" value="-1" checked onchange="updateBuiltUrl()"><span>None</span></label>
                     <label class="combine-option compact"><input type="radio" name="pitchMetric" value="0" onchange="updateBuiltUrl()"><span>100+ MPH</span></label>
@@ -1020,7 +1020,7 @@
                     <input type="checkbox" id="combineCheck" onchange="toggleCombineWarning()">
                     <span>Combine into one video (max 10 clips)</span>
                 </label>
-                <div id="combineWarning" style="display:none; color:#E67A8A; font-size:12px; margin-top:6px; line-height:1.4;">
+                <div id="combineWarning" style="display:none; color:#cc6666; font-size:12px; margin-top:6px; line-height:1.4;">
                     If you can accomplish what you need without bulk downloads, please do. Large amounts of bulk downloads put a lot of stress on our bandwidth limits and could render the site unusable for a period of time.
                 </div>
                 <button class="btn btn-download" id="downloadBtn" onclick="doDownload()">
@@ -1069,7 +1069,7 @@
                     <option value="pitching">Pitching</option>
                 </select>
                 <button class="btn-fetch-log" id="fetchLogBtn" onclick="fetchGameLog()">Load Game Logs</button>
-                <button class="btn-fetch-log" id="exportLogBtn" onclick="exportGameLog()" style="background: #5EC4E6; display: none;">Export XLSX</button>
+                <button class="btn-fetch-log" id="exportLogBtn" onclick="exportGameLog()" style="background: #ccc; color: #000; display: none;">Export XLSX</button>
             </div>
             <div class="game-log-scroll">
                 <div id="gameLogContent" class="game-log-empty">Select a season and click "Load Game Logs"</div>
@@ -1131,7 +1131,7 @@
         <ul>
             <li><strong>Broadcast</strong> &mdash; Choose Home or Away camera feed.</li>
             <li><strong>Max videos</strong> &mdash; Set a limit, or leave at 0 for all results.</li>
-            <li><strong>Combine into one video</strong> <span style="background: #2A3855; color: #F5C842; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; vertical-align: middle;">COMING SOON</span> &mdash; Will merge all selected clips into a single file.</li>
+            <li><strong>Combine into one video</strong> <span style="background: #3a3a3a; color: #fff; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; vertical-align: middle;">COMING SOON</span> &mdash; Will merge all selected clips into a single file.</li>
         </ul>
 
         <h4>Downloading</h4>
@@ -1142,7 +1142,7 @@
         </div>
 
         <h4>Custom Savant URLs</h4>
-        <p>For advanced queries, build your own search on <a href="https://baseballsavant.mlb.com/statcast_search" target="_blank" style="color: #7AD4F0;">Baseball Savant</a>, copy the resulting URL from your browser, and paste it into the search bar above.</p>
+        <p>For advanced queries, build your own search on <a href="https://baseballsavant.mlb.com/statcast_search" target="_blank" style="color: #fff; text-decoration: underline;">Baseball Savant</a>, copy the resulting URL from your browser, and paste it into the search bar above.</p>
     </div>
 
 </aside>
@@ -1494,13 +1494,13 @@ function trackProgress(jobId) {
             }
         } else if (phase === 'combining') {
             progBar.style.width = '100%';
-            progBar.style.background = 'linear-gradient(90deg, #F5C842, #F7D35A)';
+            progBar.style.background = 'linear-gradient(90deg, #fff, #d0d0d0)';
             progCurrent.innerHTML = '<span class="spinner"></span>Combining all clips into one video...';
             progCount.textContent = `${done} clips`;
             progPct.textContent = '...';
         } else if (phase === 'zipping') {
             progBar.style.width = '100%';
-            progBar.style.background = 'linear-gradient(90deg, #5EC4E6, #7AD0EC)';
+            progBar.style.background = 'linear-gradient(90deg, #ccc, #999)';
             progCurrent.innerHTML = '<span class="spinner"></span>Packaging files for download...';
             progPct.textContent = '...';
         }
@@ -1836,9 +1836,9 @@ function renderPlayerResults() {
     // Dropdown if multiple results
     if (players.length > 1) {
         html += '<div style="margin-bottom: 12px;">';
-        html += '<label style="color: #7888AA; font-size: 13px;">Select player: </label>';
+        html += '<label style="color: #888; font-size: 13px;">Select player: </label>';
         html += '<select id="playerSelect" onchange="selectPlayer(parseInt(this.value))" ';
-        html += 'style="padding: 8px 12px; border: 2px solid #1A2844; border-radius: 6px; background: #0B1026; color: #fff; font-size: 13px; margin-left: 8px;">';
+        html += 'style="padding: 8px 12px; border: 2px solid #2a2a2a; border-radius: 6px; background: #0a0a0a; color: #fff; font-size: 13px; margin-left: 8px;">';
         players.forEach((p, i) => {
             const meta = [p.position, p.team].filter(Boolean).join(' | ');
             const label = meta ? p.name + ' (' + meta + ')' : p.name;
