@@ -1673,6 +1673,7 @@ function hideSuggestions() {
 function selectSuggestion(index) {
     const player = suggestResults[index];
     if (!player) return;
+    const results = [...suggestResults]; // save before hideSuggestions clears it
     playerInput.value = player.name;
     hideSuggestions();
 
@@ -1686,7 +1687,7 @@ function selectSuggestion(index) {
     document.getElementById('savantUrlBuilder').style.display = 'none';
 
     // Use the suggest data directly — no second API call
-    playerSearchResults = suggestResults;
+    playerSearchResults = results;
     selectedPlayerIndex = index;
     renderPlayerResults();
     document.getElementById('playerResults').style.display = 'block';
