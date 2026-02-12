@@ -1043,6 +1043,7 @@
                             <th>Velo</th>
                             <th>EV</th>
                             <th>LA</th>
+                            <th>Duration</th>
                             <th>Preview</th>
                             <th class="status-cell">Status</th>
                         </tr>
@@ -1318,6 +1319,7 @@ function renderTable(videos) {
         <th>Velo</th>
         <th>EV</th>
         <th>LA</th>
+        <th>Duration</th>
         <th>Preview</th>
         <th class="status-cell">Status</th>
     </tr>`;
@@ -1344,6 +1346,7 @@ function renderTable(videos) {
             <td class="stat">${v.release_speed ? esc(v.release_speed) + ' mph' : '-'}</td>
             <td class="stat">${v.launch_speed ? esc(v.launch_speed) + ' mph' : '-'}</td>
             <td class="stat">${v.launch_angle ? esc(v.launch_angle) + '\u00b0' : '-'}</td>
+            <td class="stat">${v.duration ? esc(v.duration) : '-'}</td>
             <td><a class="preview-link" href="${esc(v.savant_url)}" target="_blank">View</a></td>
             <td class="status-cell" id="status-${i}"><span class="badge badge-ready">Ready</span></td>
         `;

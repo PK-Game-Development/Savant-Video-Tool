@@ -132,6 +132,7 @@ def fetch_game_play_ids(game_pk, session):
     data = resp.json()
     play_id_map = {}
     matchup_map = {}
+    duration_map = {}
     all_plays = data.get("liveData", {}).get("plays", {}).get("allPlays", [])
     for play in all_plays:
         ab_number = play.get("atBatIndex", -1) + 1
@@ -144,7 +145,18 @@ def fetch_game_play_ids(game_pk, session):
             pitch_num = event.get("pitchNumber")
             if play_id and pitch_num is not None:
                 play_id_map[(ab_number, pitch_num)] = play_id
-    return play_id_map, matchup_map
+                # Extract video duration from startTime/endTime
+                start = event.get("startTime", "")
+                end = event.get("endTime", "")
+                if start and end:
+                    try:
+                        st = datetime.fromisoformat(start.replace("Z", "+00:00"))
+                        et = datetime.fromisoformat(end.replace("Z", "+00:00"))
+                        dur_secs = max(0, int((et - st).total_seconds()))
+                        duration_map[(ab_number, pitch_num)] = dur_secs
+                    except (ValueError, TypeError):
+                        pass
+    return play_id_map, matchup_map, duration_map
 
 
 def sanitize_filename(name):
@@ -496,14 +508,17 @@ def api_search():
 
     game_play_maps = {}
     game_matchup_maps = {}
+    game_duration_maps = {}
     for game_pk in games:
         try:
-            play_map, matchup_map = fetch_game_play_ids(game_pk, session)
+            play_map, matchup_map, duration_map = fetch_game_play_ids(game_pk, session)
             game_play_maps[game_pk] = play_map
             game_matchup_maps[game_pk] = matchup_map
+            game_duration_maps[game_pk] = duration_map
         except Exception:
             game_play_maps[game_pk] = {}
             game_matchup_maps[game_pk] = {}
+            game_duration_maps[game_pk] = {}
         time.sleep(0.2)
 
     # Resolve play IDs
@@ -541,6 +556,13 @@ def api_search():
         batter_name = matchup[0]
         pitcher_name = matchup[1]
 
+        # Get video duration from game feed timing data
+        dur_secs = game_duration_maps.get(game_pk, {}).get((ab_num, pitch_num))
+        if dur_secs is not None:
+            duration_str = f"{dur_secs // 60}:{dur_secs % 60:02d}"
+        else:
+            duration_str = ""
+
         videos.append({
             "player": row.get("player_name", "Unknown"),
             "date": row.get("game_date", ""),
@@ -554,6 +576,7 @@ def api_search():
             "pitching_team": pitching_team,
             "batter_name": batter_name,
             "pitcher_name": pitcher_name,
+            "duration": duration_str,
             "game_pk": game_pk,
             "play_id": play_id,
             "filename": filename,
