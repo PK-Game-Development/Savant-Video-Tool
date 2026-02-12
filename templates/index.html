@@ -1502,7 +1502,8 @@ function trackProgress(jobId) {
             if (r.status === 'ok') {
                 cell.innerHTML = '<span class="badge badge-done">Done</span>';
             } else if (r.status === 'failed') {
-                cell.innerHTML = '<span class="badge badge-failed">Failed</span>';
+                const reason = r.error ? esc(r.error) : 'Unknown error';
+                cell.innerHTML = '<span class="badge badge-failed" title="' + reason + '">Failed</span>';
             }
         });
 
@@ -1535,8 +1536,22 @@ function trackProgress(jobId) {
                     showStatus(`Videos downloaded but combining failed: ${errDetail}`, 'error');
                 } else {
                     progCurrent.textContent = 'Complete!';
-                    const msg = `Done: ${job.completed} downloaded, ${job.failed} failed.`;
-                    showStatus(msg, job.failed > 0 ? 'info' : 'success');
+                    if (job.failed > 0) {
+                        const failedResults = job.results.filter(r => r.status === 'failed' && !r.filename.startsWith('_'));
+                        const reasons = {};
+                        failedResults.forEach(r => {
+                            const key = r.error || 'Unknown error';
+                            reasons[key] = (reasons[key] || 0) + 1;
+                        });
+                        const summary = Object.entries(reasons)
+                            .map(([reason, count]) => count > 1 ? `${reason} (x${count})` : reason)
+                            .join(', ');
+                        const msg = `Done: ${job.completed} downloaded, ${job.failed} failed. Reasons: ${summary}`;
+                        showStatus(msg, 'info');
+                    } else {
+                        const msg = `Done: ${job.completed} downloaded, ${job.failed} failed.`;
+                        showStatus(msg, 'success');
+                    }
                 }
             }
         }

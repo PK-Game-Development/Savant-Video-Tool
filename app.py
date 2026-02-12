@@ -177,15 +177,73 @@ def download_video_file(url, output_path, session):
 
 
 def try_download(game_pk, play_id, broadcast, output_path, session):
+    """Attempt to download a video clip, trying both broadcast angles.
+
+    Returns dict: {"success": bool, "error": str|None, "status_code": int|None}
+    """
     broadcasts = [broadcast, "away" if broadcast == "home" else "home"]
+    last_error = None
+    last_status = None
+
     for bc in broadcasts:
         video_url = VIDEO_CDN_URL.format(game_pk=game_pk, broadcast=bc, play_id=play_id)
         try:
             download_video_file(video_url, output_path, session)
-            return True
-        except (requests.HTTPError, requests.ConnectionError):
-            continue
+            return {"success": True, "error": None, "status_code": None}
+        except requests.HTTPError as e:
+            last_status = e.response.status_code if e.response is not None else None
+            last_error = f"HTTP {last_status}" if last_status else str(e)
+        except requests.Timeout:
+            last_error = "Request timed out"
+            last_status = None
+        except requests.ConnectionError:
+            last_error = "Connection failed"
+            last_status = None
+        except requests.RequestException as e:
+            last_error = f"Download error: {type(e).__name__}"
+            last_status = None
+        except IOError as e:
+            last_error = f"Disk write error: {e}"
+            last_status = None
+
+    return {"success": False, "error": last_error, "status_code": last_status}
+
+
+MAX_RETRIES = 2
+RETRY_BACKOFF_BASE = 2  # delays: 2s, 4s
+
+
+def _is_retryable(result):
+    """Determine if a failed download should be retried."""
+    if result["success"]:
+        return False
+    sc = result.get("status_code")
+    err = result.get("error", "")
+    if sc is not None and (sc >= 500 or sc == 429):
+        return True
+    if "timed out" in err.lower() or "connection" in err.lower():
+        return True
     return False
+
+
+def try_download_with_retry(game_pk, play_id, broadcast, output_path, session):
+    """Download with retry and exponential backoff for transient errors."""
+    result = try_download(game_pk, play_id, broadcast, output_path, session)
+    if result["success"] or not _is_retryable(result):
+        return result
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        time.sleep(RETRY_BACKOFF_BASE ** attempt)
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
+        result = try_download(game_pk, play_id, broadcast, output_path, session)
+        if result["success"] or not _is_retryable(result):
+            break
+
+    return result
 
 
 def probe_has_audio(path):
@@ -556,71 +614,91 @@ def api_download():
         job = jobs[job_id]
         downloaded_paths = []
 
-        # Phase 1: Download all videos
-        for video in videos:
-            game_pk = video["game_pk"]
-            play_id = video["play_id"]
-            filename = video["filename"]
-            output_path = os.path.join(job_dir, filename)
+        try:
+            # Phase 1: Download all videos
+            for video in videos:
+                game_pk = video["game_pk"]
+                play_id = video["play_id"]
+                filename = video["filename"]
+                output_path = os.path.join(job_dir, filename)
 
-            job["current"] = f"{video.get('player', '')} - {video.get('date', '')}"
+                job["current"] = f"{video.get('player', '')} - {video.get('date', '')}"
 
-            success = try_download(game_pk, play_id, broadcast, output_path, session)
+                try:
+                    result = try_download_with_retry(
+                        game_pk, play_id, broadcast, output_path, session
+                    )
+                except Exception as e:
+                    result = {
+                        "success": False,
+                        "error": f"Unexpected: {type(e).__name__}: {e}",
+                        "status_code": None,
+                    }
 
-            if success:
-                job["completed"] += 1
-                job["results"].append({"filename": filename, "status": "ok"})
-                downloaded_paths.append(output_path)
-            else:
-                job["failed"] += 1
-                job["results"].append({"filename": filename, "status": "failed"})
-                if os.path.exists(output_path):
-                    os.remove(output_path)
+                if result["success"]:
+                    job["completed"] += 1
+                    job["results"].append({"filename": filename, "status": "ok"})
+                    downloaded_paths.append(output_path)
+                else:
+                    job["failed"] += 1
+                    entry = {"filename": filename, "status": "failed"}
+                    if result.get("error"):
+                        entry["error"] = result["error"]
+                    job["results"].append(entry)
+                    if os.path.exists(output_path):
+                        try:
+                            os.remove(output_path)
+                        except OSError:
+                            pass
 
-            time.sleep(0.3)
+                time.sleep(0.5)
 
-        # Phase 2: Combine if requested
-        if combine and len(downloaded_paths) >= 2:
-            job["phase"] = "combining"
-            job["current"] = "Combining all clips into one video..."
-            try:
-                combined_path = os.path.join(job_dir, "combined_video.mp4")
-                combine_videos(downloaded_paths, combined_path)
-                job["download_file"] = "combined_video.mp4"
+            # Phase 2: Combine if requested
+            if combine and len(downloaded_paths) >= 2:
+                job["phase"] = "combining"
+                job["current"] = "Combining all clips into one video..."
+                try:
+                    combined_path = os.path.join(job_dir, "combined_video.mp4")
+                    combine_videos(downloaded_paths, combined_path)
+                    job["download_file"] = "combined_video.mp4"
+                    job["download_ready"] = True
+                except Exception as e:
+                    job["results"].append({
+                        "filename": "combined_video.mp4",
+                        "status": "failed",
+                        "error": str(e),
+                    })
+
+            elif combine and len(downloaded_paths) == 1:
+                # Only one video — just offer it directly
+                job["download_file"] = os.path.basename(downloaded_paths[0])
                 job["download_ready"] = True
-            except Exception as e:
-                job["results"].append({
-                    "filename": "combined_video.mp4",
-                    "status": "failed",
-                    "error": str(e),
-                })
 
-        elif combine and len(downloaded_paths) == 1:
-            # Only one video — just offer it directly
-            job["download_file"] = os.path.basename(downloaded_paths[0])
-            job["download_ready"] = True
+            elif not combine and downloaded_paths:
+                # No combine — zip all individual files
+                job["phase"] = "zipping"
+                job["current"] = "Packaging files..."
+                try:
+                    zip_path = os.path.join(job_dir, "savant_videos.zip")
+                    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
+                        for path in downloaded_paths:
+                            zf.write(path, os.path.basename(path))
+                    job["download_file"] = "savant_videos.zip"
+                    job["download_ready"] = True
+                except Exception as e:
+                    job["results"].append({
+                        "filename": "savant_videos.zip",
+                        "status": "failed",
+                        "error": str(e),
+                    })
 
-        elif not combine and downloaded_paths:
-            # No combine — zip all individual files
-            job["phase"] = "zipping"
-            job["current"] = "Packaging files..."
-            try:
-                zip_path = os.path.join(job_dir, "savant_videos.zip")
-                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_STORED) as zf:
-                    for path in downloaded_paths:
-                        zf.write(path, os.path.basename(path))
-                job["download_file"] = "savant_videos.zip"
-                job["download_ready"] = True
-            except Exception as e:
-                job["results"].append({
-                    "filename": "savant_videos.zip",
-                    "status": "failed",
-                    "error": str(e),
-                })
+        except Exception:
+            pass  # individual errors already handled above
 
-        job["phase"] = "done"
-        job["status"] = "done"
-        job["current"] = ""
+        finally:
+            job["phase"] = "done"
+            job["status"] = "done"
+            job["current"] = ""
 
     thread = threading.Thread(target=run_job, daemon=True)
     thread.start()
