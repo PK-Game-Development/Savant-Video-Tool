@@ -1003,10 +1003,13 @@
             <div class="results-actions">
                 <button class="btn btn-select" onclick="selectAll()">Select All</button>
                 <button class="btn btn-select" onclick="selectNone()">Select None</button>
-                <label class="combine-option disabled" title="Combine all clips into a single video file">
-                    <input type="checkbox" id="combineCheck" disabled>
-                    <span>Combine into one video — Coming Soon!</span>
+                <label class="combine-option" id="combineLabel" title="Combine all clips into a single video file">
+                    <input type="checkbox" id="combineCheck" onchange="toggleCombineWarning()">
+                    <span>Combine into one video (max 10 clips)</span>
                 </label>
+                <div id="combineWarning" style="display:none; color:#E67A8A; font-size:12px; margin-top:6px; line-height:1.4;">
+                    If you can accomplish what you need without bulk downloads, please do. Large amounts of bulk downloads put a lot of stress on our bandwidth limits and could render the site unusable for a period of time.
+                </div>
                 <button class="btn btn-download" id="downloadBtn" onclick="doDownload()">
                     Download Selected
                 </button>
@@ -1316,7 +1319,7 @@ function renderTable(videos) {
 
         tr.innerHTML = `
             <td class="checkbox-cell">
-                <input type="checkbox" class="vid-check" data-index="${i}" checked>
+                <input type="checkbox" class="vid-check" data-index="${i}" checked onchange="updateSelectionCount()">
             </td>
             <td class="player">${esc(v.player)}</td>
             <td class="date">${esc(v.date)}</td>
@@ -1343,15 +1346,44 @@ function esc(str) {
 function selectAll() {
     document.querySelectorAll('.vid-check').forEach(cb => cb.checked = true);
     document.getElementById('checkAll').checked = true;
+    updateSelectionCount();
 }
 
 function selectNone() {
     document.querySelectorAll('.vid-check').forEach(cb => cb.checked = false);
     document.getElementById('checkAll').checked = false;
+    updateSelectionCount();
 }
 
 function toggleAll(master) {
     document.querySelectorAll('.vid-check').forEach(cb => cb.checked = master.checked);
+    updateSelectionCount();
+}
+
+function toggleCombineWarning() {
+    const checked = document.getElementById('combineCheck').checked;
+    document.getElementById('combineWarning').style.display = checked ? 'block' : 'none';
+}
+
+function updateSelectionCount() {
+    const count = document.querySelectorAll('.vid-check:checked').length;
+    const combineCheck = document.getElementById('combineCheck');
+    const combineLabel = document.getElementById('combineLabel');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    if (count > 10) {
+        combineCheck.checked = false;
+        combineCheck.disabled = true;
+        combineLabel.classList.add('disabled');
+        downloadBtn.disabled = true;
+        showStatus('Please select 10 or fewer clips. Downloads are limited to 10 clips at a time to manage bandwidth.', 'error');
+    } else {
+        combineCheck.disabled = false;
+        combineLabel.classList.remove('disabled');
+        downloadBtn.disabled = false;
+        hideStatus();
+    }
+    toggleCombineWarning();
 }
 
 async function doDownload() {
@@ -1363,6 +1395,11 @@ async function doDownload() {
 
     if (selected.length === 0) {
         showStatus('No videos selected.', 'error');
+        return;
+    }
+
+    if (selected.length > 10) {
+        showStatus('Please select 10 or fewer clips. Downloads are limited to 10 clips at a time to manage bandwidth.', 'error');
         return;
     }
 

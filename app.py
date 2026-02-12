@@ -86,6 +86,10 @@ JOB_TTL = 3600  # 1 hour
 # Active jobs: job_id -> job state dict
 jobs = {}
 
+# Player search cache: query -> (timestamp, results)
+_player_cache = {}
+_PLAYER_CACHE_TTL = 300  # 5 minutes
+
 
 # --- Helpers ---
 
@@ -211,9 +215,9 @@ def normalize_clip(input_path, output_path):
         cmd.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"])
 
     cmd.extend([
-        "-vf", "scale=960:540:force_original_aspect_ratio=decrease,"
-               "pad=960:540:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+        "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
+               "pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "17",
         "-ar", "44100", "-ac", "1", "-c:a", "aac", "-b:a", "96k",
     ])
 
@@ -308,6 +312,14 @@ def api_player_search():
     if not name or len(name) < 2:
         return jsonify({"error": "Please enter at least 2 characters."}), 400
 
+    # Check cache first
+    cache_key = name.lower()
+    now = time.time()
+    if cache_key in _player_cache:
+        cached_time, cached_result = _player_cache[cache_key]
+        if now - cached_time < _PLAYER_CACHE_TTL:
+            return jsonify(cached_result)
+
     session = create_session()
 
     try:
@@ -388,7 +400,9 @@ def api_player_search():
             "links": links,
         })
 
-    return jsonify({"players": results})
+    result = {"players": results}
+    _player_cache[cache_key] = (time.time(), result)
+    return jsonify(result)
 
 
 @app.route("/api/search", methods=["POST"])
@@ -512,6 +526,9 @@ def api_download():
 
     if not videos:
         return jsonify({"error": "No videos selected"}), 400
+
+    if len(videos) > 10:
+        return jsonify({"error": "Downloads are limited to 10 clips at a time to manage bandwidth."}), 400
 
     # Cleanup old jobs opportunistically
     cleanup_old_jobs()
