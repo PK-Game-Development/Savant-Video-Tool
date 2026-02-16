@@ -884,6 +884,65 @@
             max-height: 0 !important;
         }
 
+        /* Highlights Section */
+        .highlights-section {
+            background: #262626;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+        .highlights-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+        .highlights-header h3 {
+            color: #e0e0e0;
+            margin: 0;
+            font-size: 20px;
+        }
+        .highlights-date {
+            color: #808080;
+            font-size: 13px;
+        }
+        .highlights-loading {
+            color: #808080;
+            font-size: 13px;
+            padding: 16px 0;
+        }
+        .highlights-error {
+            color: #b05555;
+            font-size: 13px;
+            padding: 8px 0;
+        }
+        .highlights-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .highlights-table th {
+            background: #242424;
+            color: #808080;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 8px 10px;
+            text-align: left;
+        }
+        .highlights-table td {
+            padding: 8px 10px;
+            font-size: 13px;
+            border-top: 1px solid #2e2e2e;
+        }
+        .highlights-table tr:hover { background: #1f1f1f; }
+        .highlights-table .player { font-weight: 600; color: #e0e0e0; }
+        .highlights-table .event { color: #b8b8b8; }
+        .highlights-table .stat { color: #999; font-variant-numeric: tabular-nums; }
+        .highlights-table .wpa-pos { color: #6abf6a; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .highlights-table .wpa-neg { color: #b05555; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .highlights-table .desc { color: #b8b8b8; font-size: 12px; max-width: 280px; }
+
         @media (max-width: 960px) {
             .page-layout {
                 flex-direction: column;
@@ -907,6 +966,17 @@
 
 <div class="page-layout">
 <div class="main-content">
+
+    <!-- Today's Highlights -->
+    <div class="highlights-section" id="highlightsSection">
+        <div class="highlights-header">
+            <h3>Today's Highlights</h3>
+            <span class="highlights-date" id="highlightsDate"></span>
+        </div>
+        <div id="highlightsContent">
+            <p class="highlights-loading" id="highlightsLoading">Loading today's top plays...</p>
+        </div>
+    </div>
 
     <!-- Player Search -->
     <div class="player-search-section">
@@ -2208,6 +2278,50 @@ function exportGameLog() {
         showStatus('Failed to export game log.', 'error');
     });
 }
+
+// --- Today's Highlights ---
+(function() {
+    fetch('/api/highlights')
+        .then(r => {
+            if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Failed'); });
+            return r.json();
+        })
+        .then(data => {
+            const dateEl = document.getElementById('highlightsDate');
+            const contentEl = document.getElementById('highlightsContent');
+            dateEl.textContent = data.game_date || '';
+
+            if (!data.videos || data.videos.length === 0) {
+                contentEl.innerHTML = '<p class="highlights-error">No highlights available yet for this date.</p>';
+                return;
+            }
+
+            let html = '<div class="video-table-wrap"><div class="table-scroll"><table class="highlights-table"><thead><tr>';
+            html += '<th>#</th><th>Player</th><th>Result</th><th>Description</th>';
+            html += '<th>WPA</th><th>EV</th><th>Preview</th>';
+            html += '</tr></thead><tbody>';
+
+            data.videos.forEach((v, i) => {
+                const wpaClass = v.wpa && v.wpa.startsWith('+') ? 'wpa-pos' : 'wpa-neg';
+                html += '<tr>';
+                html += '<td class="stat">' + (i + 1) + '</td>';
+                html += '<td class="player">' + esc(v.player) + '</td>';
+                html += '<td class="event">' + esc(v.event || '-') + '</td>';
+                html += '<td class="desc">' + esc(v.description || '-') + '</td>';
+                html += '<td class="' + wpaClass + '">' + esc(v.wpa || '-') + '</td>';
+                html += '<td class="stat">' + (v.launch_speed ? esc(v.launch_speed) + ' mph' : '-') + '</td>';
+                html += '<td><a class="preview-link" href="' + esc(v.savant_url) + '" target="_blank">View</a></td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div></div>';
+            contentEl.innerHTML = html;
+        })
+        .catch(err => {
+            const contentEl = document.getElementById('highlightsContent');
+            contentEl.innerHTML = '<p class="highlights-error">Could not load highlights: ' + esc(err.message) + '</p>';
+        });
+})();
 </script>
 
 </body>

@@ -41,6 +41,7 @@ MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
 VIDEO_CDN_URL = "https://fastball-clips.mlb.com/{game_pk}/{broadcast}/{play_id}.mp4"
 SPORTY_VIDEO_URL = "https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
 MLB_PLAYER_SEARCH_URL = "https://statsapi.mlb.com/api/v1/people/search?names={name}&hydrate=currentTeam,xrefId"
+MLB_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}"
 
 # MLB team ID -> Fangraphs depth chart slug (team nickname only)
 FANGRAPHS_TEAM_SLUGS = {
@@ -89,6 +90,10 @@ jobs = {}
 # Player search cache: query -> (timestamp, results)
 _player_cache = {}
 _PLAYER_CACHE_TTL = 300  # 5 minutes
+
+# Highlights cache: (timestamp, data)
+_highlights_cache = (0, None)
+_HIGHLIGHTS_CACHE_TTL = 600  # 10 minutes
 
 
 # --- Helpers ---
@@ -595,6 +600,178 @@ def api_search():
         "player_type": player_type,
         "videos": videos,
     })
+
+
+def _find_most_recent_game_date(session):
+    """Walk backwards from today to find the most recent date with Final MLB games."""
+    from datetime import timedelta
+    today = datetime.now()
+    for days_back in range(0, 14):
+        check = today - timedelta(days=days_back)
+        date_str = check.strftime("%Y-%m-%d")
+        try:
+            resp = session.get(MLB_SCHEDULE_URL.format(date=date_str), timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            dates = data.get("dates", [])
+            if dates:
+                games = dates[0].get("games", [])
+                final_games = [g for g in games if g.get("status", {}).get("abstractGameState") == "Final"]
+                if final_games:
+                    return date_str
+        except Exception:
+            continue
+    return None
+
+
+@app.route("/api/highlights", methods=["GET"])
+def api_highlights():
+    """Return top plays from the most recent MLB day, sorted by Win Probability Added."""
+    global _highlights_cache
+
+    # Serve from cache if fresh
+    cache_ts, cache_data = _highlights_cache
+    if cache_data is not None and (time.time() - cache_ts) < _HIGHLIGHTS_CACHE_TTL:
+        return jsonify(cache_data)
+
+    session = create_session()
+
+    game_date = _find_most_recent_game_date(session)
+    if not game_date:
+        return jsonify({"error": "No recent MLB games found."}), 404
+
+    # Build Statcast CSV URL for that date — fetch all pitches with events (plate appearance results)
+    csv_params = urlencode({
+        "all": "true",
+        "type": "details",
+        "hfGT": "R|",
+        "game_date_gt": game_date,
+        "game_date_lt": game_date,
+        "sortColumn": "delta_run_exp",
+        "sortOrder": "desc",
+        "player_type": "batter",
+        "min_results": "0",
+    }, doseq=True)
+    csv_url = f"{STATCAST_CSV_BASE}?{csv_params}"
+
+    try:
+        resp = session.get(csv_url, timeout=120)
+        resp.raise_for_status()
+        text = resp.text.strip()
+        if not text:
+            return jsonify({"error": "No Statcast data for this date yet."}), 404
+        reader = csv.DictReader(io.StringIO(text))
+        rows = list(reader)
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch highlights: {e}"}), 500
+
+    if not rows:
+        return jsonify({"error": "No Statcast data for this date yet."}), 404
+
+    # Filter to only rows that have a plate appearance result (events field) and WPA
+    pa_rows = []
+    for row in rows:
+        event = row.get("events", "").strip()
+        wpa_str = row.get("delta_run_exp", "").strip()
+        if event and wpa_str:
+            try:
+                row["_wpa"] = float(wpa_str)
+            except ValueError:
+                continue
+            pa_rows.append(row)
+
+    # Sort by absolute WPA descending and take top 15
+    pa_rows.sort(key=lambda r: abs(r["_wpa"]), reverse=True)
+    pa_rows = pa_rows[:15]
+
+    # Resolve play IDs (same flow as /api/search)
+    games = defaultdict(list)
+    for row in pa_rows:
+        gp = row.get("game_pk", "")
+        if gp:
+            games[gp].append(row)
+
+    game_play_maps = {}
+    game_matchup_maps = {}
+    game_duration_maps = {}
+    for game_pk in games:
+        try:
+            play_map, matchup_map, duration_map = fetch_game_play_ids(game_pk, session)
+            game_play_maps[game_pk] = play_map
+            game_matchup_maps[game_pk] = matchup_map
+            game_duration_maps[game_pk] = duration_map
+        except Exception:
+            game_play_maps[game_pk] = {}
+            game_matchup_maps[game_pk] = {}
+            game_duration_maps[game_pk] = {}
+        time.sleep(0.2)
+
+    videos = []
+    for row in pa_rows:
+        game_pk = row.get("game_pk", "")
+        try:
+            ab_num = int(row.get("at_bat_number", 0))
+            pitch_num = int(row.get("pitch_number", 0))
+        except (ValueError, TypeError):
+            continue
+
+        play_id = game_play_maps.get(game_pk, {}).get((ab_num, pitch_num))
+        if not play_id:
+            continue
+
+        home = row.get("home_team", "")
+        away = row.get("away_team", "")
+        topbot = row.get("inning_topbot", "")
+        if topbot == "Top":
+            batting_team = away
+            pitching_team = home
+        elif topbot == "Bot":
+            batting_team = home
+            pitching_team = away
+        else:
+            batting_team = ""
+            pitching_team = ""
+
+        matchup = game_matchup_maps.get(game_pk, {}).get(ab_num, ("", ""))
+        batter_name = matchup[0]
+        pitcher_name = matchup[1]
+
+        dur_secs = game_duration_maps.get(game_pk, {}).get((ab_num, pitch_num))
+        if dur_secs is not None:
+            duration_str = f"{dur_secs // 60}:{dur_secs % 60:02d}"
+        else:
+            duration_str = ""
+
+        wpa = row.get("_wpa", 0)
+        wpa_display = f"+{wpa:.2f}" if wpa >= 0 else f"{wpa:.2f}"
+
+        videos.append({
+            "player": row.get("player_name", "Unknown"),
+            "date": row.get("game_date", ""),
+            "event": row.get("events", ""),
+            "description": row.get("des", ""),
+            "pitch_type": row.get("pitch_type", ""),
+            "release_speed": row.get("release_speed", ""),
+            "launch_speed": row.get("launch_speed", ""),
+            "launch_angle": row.get("launch_angle", ""),
+            "batting_team": batting_team,
+            "pitching_team": pitching_team,
+            "batter_name": batter_name,
+            "pitcher_name": pitcher_name,
+            "duration": duration_str,
+            "wpa": wpa_display,
+            "game_pk": game_pk,
+            "play_id": play_id,
+            "filename": build_filename(row),
+            "savant_url": SPORTY_VIDEO_URL.format(play_id=play_id),
+        })
+
+    result = {
+        "game_date": game_date,
+        "videos": videos,
+    }
+    _highlights_cache = (time.time(), result)
+    return jsonify(result)
 
 
 @app.route("/api/download", methods=["POST"])
