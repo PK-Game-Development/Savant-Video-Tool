@@ -12,7 +12,9 @@ Deploy:   Docker / Render / Railway
 import csv
 import io
 import json
+import logging
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -26,6 +28,8 @@ from datetime import datetime
 from urllib.parse import urlparse, parse_qs, urlencode
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -34,6 +38,12 @@ from flask import (
 )
 
 app = Flask(__name__)
+
+logger = logging.getLogger("savant_dl")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
 
 # --- Config ---
 STATCAST_CSV_BASE = "https://baseballsavant.mlb.com/statcast_search/csv"
@@ -99,9 +109,19 @@ def create_session():
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
+            "Chrome/131.0.0.0 Safari/537.36"
         ),
     })
+    retry_strategy = Retry(
+        total=3,
+        backoff_factor=0.5,
+        status_forcelist=[502, 503, 504],
+        allowed_methods=["GET"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
     return session
 
 
@@ -181,11 +201,35 @@ def download_video_file(url, output_path, session):
         "Origin": "https://www.mlb.com",
         "Referer": "https://www.mlb.com/",
     }
-    resp = session.get(url, stream=True, timeout=120, headers=headers)
+    resp = session.get(url, stream=True, timeout=(10, 120), headers=headers)
     resp.raise_for_status()
+
+    expected_size = resp.headers.get("Content-Length")
+    bytes_written = 0
     with open(output_path, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192):
             f.write(chunk)
+            bytes_written += len(chunk)
+
+    if expected_size is not None:
+        expected_size = int(expected_size)
+        if bytes_written < expected_size:
+            try:
+                os.remove(output_path)
+            except OSError:
+                pass
+            raise requests.ConnectionError(
+                f"Incomplete download: got {bytes_written} of {expected_size} bytes"
+            )
+
+    if bytes_written == 0:
+        try:
+            os.remove(output_path)
+        except OSError:
+            pass
+        raise requests.ConnectionError("Empty response body (0 bytes received)")
+
+    logger.info("Downloaded %s (%d bytes)", os.path.basename(output_path), bytes_written)
 
 
 def try_download(game_pk, play_id, broadcast, output_path, session):
@@ -205,24 +249,30 @@ def try_download(game_pk, play_id, broadcast, output_path, session):
         except requests.HTTPError as e:
             last_status = e.response.status_code if e.response is not None else None
             last_error = f"HTTP {last_status}" if last_status else str(e)
+            logger.warning("HTTP error for %s/%s/%s: %s", game_pk, bc, play_id, last_error)
         except requests.Timeout:
             last_error = "Request timed out"
             last_status = None
-        except requests.ConnectionError:
-            last_error = "Connection failed"
+            logger.warning("Timeout for %s/%s/%s", game_pk, bc, play_id)
+        except requests.ConnectionError as e:
+            last_error = f"Connection failed: {e}"
             last_status = None
+            logger.warning("Connection error for %s/%s/%s: %s", game_pk, bc, play_id, e)
         except requests.RequestException as e:
             last_error = f"Download error: {type(e).__name__}"
             last_status = None
+            logger.warning("Request error for %s/%s/%s: %s", game_pk, bc, play_id, last_error)
         except IOError as e:
             last_error = f"Disk write error: {e}"
             last_status = None
+            logger.warning("Disk error for %s/%s/%s: %s", game_pk, bc, play_id, e)
 
+    logger.error("All broadcasts failed for game_pk=%s play_id=%s: %s", game_pk, play_id, last_error)
     return {"success": False, "error": last_error, "status_code": last_status}
 
 
-MAX_RETRIES = 2
-RETRY_BACKOFF_BASE = 2  # delays: 2s, 4s
+MAX_RETRIES = 3
+RETRY_BACKOFF_BASE = 2  # delays: ~2s, ~4s, ~8s (plus jitter)
 
 
 def _is_retryable(result):
@@ -231,7 +281,7 @@ def _is_retryable(result):
         return False
     sc = result.get("status_code")
     err = result.get("error", "")
-    if sc is not None and (sc >= 500 or sc == 429):
+    if sc is not None and (sc >= 500 or sc == 429 or sc == 403):
         return True
     if "timed out" in err.lower() or "connection" in err.lower():
         return True
@@ -239,13 +289,21 @@ def _is_retryable(result):
 
 
 def try_download_with_retry(game_pk, play_id, broadcast, output_path, session):
-    """Download with retry and exponential backoff for transient errors."""
+    """Download with retry and exponential backoff + jitter for transient errors."""
     result = try_download(game_pk, play_id, broadcast, output_path, session)
     if result["success"] or not _is_retryable(result):
         return result
 
     for attempt in range(1, MAX_RETRIES + 1):
-        time.sleep(RETRY_BACKOFF_BASE ** attempt)
+        base_delay = RETRY_BACKOFF_BASE ** attempt
+        jitter = random.uniform(0, base_delay * 0.5)
+        delay = base_delay + jitter
+        logger.warning(
+            "Retry %d/%d for play_id=%s (reason: %s), waiting %.1fs",
+            attempt, MAX_RETRIES, play_id, result.get("error", "unknown"), delay,
+        )
+        time.sleep(delay)
+
         if os.path.exists(output_path):
             try:
                 os.remove(output_path)
@@ -542,6 +600,7 @@ def api_download():
         session = create_session()
         job = jobs[job_id]
         downloaded_paths = []
+        logger.info("Job %s started: %d videos, broadcast=%s", job_id, len(videos), broadcast)
 
         try:
             # Phase 1: Download all videos
@@ -574,6 +633,7 @@ def api_download():
                     if result.get("error"):
                         entry["error"] = result["error"]
                     job["results"].append(entry)
+                    logger.warning("Job %s: FAILED %s - %s", job_id, filename, result.get("error"))
                     if os.path.exists(output_path):
                         try:
                             os.remove(output_path)
@@ -607,6 +667,10 @@ def api_download():
             job["phase"] = "done"
             job["status"] = "done"
             job["current"] = ""
+            logger.info(
+                "Job %s complete: %d/%d succeeded, %d failed",
+                job_id, job["completed"], len(videos), job["failed"],
+            )
 
     thread = threading.Thread(target=run_job, daemon=True)
     thread.start()
