@@ -20,10 +20,8 @@ import csv
 import io
 import os
 import re
-import shutil
 import subprocess
 import sys
-import tempfile
 import time
 from collections import defaultdict
 from urllib.parse import urlparse, parse_qs, urlencode
@@ -188,39 +186,6 @@ def try_download_video(game_pk, play_id, broadcast, output_path, session):
     return False
 
 
-def combine_videos(file_paths, output_path):
-    """Combine multiple mp4 files into one using ffmpeg's concat demuxer."""
-    if not shutil.which("ffmpeg"):
-        print("Error: ffmpeg is not installed.")
-        print("Install it by pasting this into Terminal: brew install ffmpeg")
-        sys.exit(1)
-
-    tmp_fd, tmp_list = tempfile.mkstemp(suffix=".txt")
-    try:
-        with os.fdopen(tmp_fd, "w") as f:
-            for path in file_paths:
-                escaped = path.replace("'", "'\\''")
-                f.write(f"file '{escaped}'\n")
-
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", tmp_list,
-            "-c", "copy",
-            output_path,
-        ]
-        print("Combining videos with ffmpeg...")
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-        if result.returncode != 0:
-            print(f"Error: ffmpeg failed: {result.stderr}")
-            sys.exit(1)
-    finally:
-        os.unlink(tmp_list)
-
-    size_mb = os.path.getsize(output_path) / (1024 * 1024)
-    print(f"Combined video saved: {output_path} ({size_mb:.1f} MB)")
-
 
 def main():
     parser = argparse.ArgumentParser(
@@ -260,16 +225,6 @@ def main():
         "--list",
         action="store_true",
         help="List video URLs without downloading",
-    )
-    parser.add_argument(
-        "--combine",
-        action="store_true",
-        help="After downloading, combine all videos into one big video",
-    )
-    parser.add_argument(
-        "--combine-name",
-        default="combined_video.mp4",
-        help="Filename for the combined video (default: combined_video.mp4)",
     )
 
     args = parser.parse_args()
@@ -403,11 +358,6 @@ def main():
     print(f"{'=' * 50}")
     print(f"Videos saved to: {os.path.abspath(args.output)}/")
 
-    # --- Combine videos ---
-    if args.combine and downloaded_files:
-        print(f"\nCombining {len(downloaded_files)} videos into one...")
-        combine_output = os.path.join(args.output, args.combine_name)
-        combine_videos(downloaded_files, combine_output)
 
 
 if __name__ == "__main__":

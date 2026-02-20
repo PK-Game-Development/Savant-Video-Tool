@@ -263,95 +263,6 @@ def try_download_with_retry(game_pk, play_id, broadcast, output_path, session):
     return result
 
 
-def probe_has_audio(path):
-    """Check if a video file has an audio stream."""
-    cmd = [
-        "ffprobe", "-v", "quiet",
-        "-select_streams", "a",
-        "-show_entries", "stream=index",
-        "-of", "csv=p=0",
-        path,
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-    return bool(result.stdout.strip())
-
-
-def normalize_clip(input_path, output_path):
-    """Normalize a single clip to 1280x720, 30fps, with audio (silent if none).
-
-    This ensures all clips have identical format so concat demuxer works.
-    """
-    has_audio = probe_has_audio(input_path)
-
-    cmd = ["ffmpeg", "-y", "-i", input_path]
-
-    if not has_audio:
-        # Add a silent audio source; -shortest stops when video ends
-        cmd.extend(["-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo"])
-
-    cmd.extend([
-        "-vf", "scale=1280:720:force_original_aspect_ratio=decrease,"
-               "pad=1280:720:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30",
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "17",
-        "-ar", "44100", "-ac", "1", "-c:a", "aac", "-b:a", "96k",
-    ])
-
-    if not has_audio:
-        cmd.append("-shortest")
-
-    cmd.extend(["-movflags", "+faststart", output_path])
-
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"ffmpeg normalize failed for {os.path.basename(input_path)}: "
-            f"{result.stderr[-300:]}"
-        )
-
-
-def combine_videos(file_paths, output_path):
-    """Combine multiple mp4 files using a two-step approach.
-
-    Step 1: Normalize each clip to identical format (resolution, fps, audio).
-    Step 2: Use ffmpeg concat demuxer to join them (fast, since formats match).
-    """
-    if not shutil.which("ffmpeg"):
-        raise RuntimeError("ffmpeg is not installed on this server.")
-
-    work_dir = os.path.dirname(output_path)
-    normalized = []
-
-    # Step 1: Normalize each clip
-    for i, path in enumerate(file_paths):
-        norm_path = os.path.join(work_dir, f"_norm_{i}.mp4")
-        normalize_clip(path, norm_path)
-        normalized.append(norm_path)
-
-    # Step 2: Write concat list and join
-    list_path = os.path.join(work_dir, "_concat_list.txt")
-    try:
-        with open(list_path, "w") as f:
-            for norm in normalized:
-                f.write(f"file '{norm}'\n")
-
-        cmd = [
-            "ffmpeg", "-y",
-            "-f", "concat", "-safe", "0", "-i", list_path,
-            "-c", "copy",
-            "-movflags", "+faststart",
-            output_path,
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        if result.returncode != 0:
-            raise RuntimeError(f"ffmpeg concat failed: {result.stderr[-300:]}")
-    finally:
-        # Clean up temp files
-        for norm in normalized:
-            if os.path.exists(norm):
-                os.remove(norm)
-        if os.path.exists(list_path):
-            os.remove(list_path)
-
 
 def get_job_dir(job_id):
     """Return the temp directory for a specific job."""
@@ -780,13 +691,9 @@ def api_download():
     data = request.get_json()
     videos = data.get("videos", [])
     broadcast = data.get("broadcast", "home")
-    combine = data.get("combine", False)
 
     if not videos:
         return jsonify({"error": "No videos selected"}), 400
-
-    if len(videos) > 10:
-        return jsonify({"error": "Downloads are limited to 10 clips at a time to manage bandwidth."}), 400
 
     # Cleanup old jobs opportunistically
     cleanup_old_jobs()
@@ -803,7 +710,6 @@ def api_download():
         "failed": 0,
         "current": "",
         "results": [],
-        "combine": combine,
         "download_ready": False,
         "download_file": None,
         "job_dir": job_dir,
@@ -853,29 +759,8 @@ def api_download():
 
                 time.sleep(0.5)
 
-            # Phase 2: Combine if requested
-            if combine and len(downloaded_paths) >= 2:
-                job["phase"] = "combining"
-                job["current"] = "Combining all clips into one video..."
-                try:
-                    combined_path = os.path.join(job_dir, "combined_video.mp4")
-                    combine_videos(downloaded_paths, combined_path)
-                    job["download_file"] = "combined_video.mp4"
-                    job["download_ready"] = True
-                except Exception as e:
-                    job["results"].append({
-                        "filename": "combined_video.mp4",
-                        "status": "failed",
-                        "error": str(e),
-                    })
-
-            elif combine and len(downloaded_paths) == 1:
-                # Only one video — just offer it directly
-                job["download_file"] = os.path.basename(downloaded_paths[0])
-                job["download_ready"] = True
-
-            elif not combine and downloaded_paths:
-                # No combine — zip all individual files
+            # Phase 2: Zip all individual files
+            if downloaded_paths:
                 job["phase"] = "zipping"
                 job["current"] = "Packaging files..."
                 try:
@@ -937,20 +822,19 @@ def api_progress(job_id):
 
 @app.route("/api/download-file/<job_id>")
 def api_download_file(job_id):
-    """Download the final file (combined video or zip) for a completed job."""
+    """Download the final zip file for a completed job."""
     job = jobs.get(job_id)
     job_dir = get_job_dir(job_id)
 
     if job and job.get("download_ready"):
         filename = job["download_file"]
     else:
-        # Fallback: look for the expected output files on disk
+        # Fallback: look for the expected output file on disk
         if not os.path.isdir(job_dir):
             abort(404)
-        for name in ("combined_video.mp4", "savant_videos.zip"):
-            if os.path.exists(os.path.join(job_dir, name)):
-                filename = name
-                break
+        zip_name = "savant_videos.zip"
+        if os.path.exists(os.path.join(job_dir, zip_name)):
+            filename = zip_name
         else:
             abort(404)
 

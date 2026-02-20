@@ -274,39 +274,6 @@
         .btn-discard:hover:not(:disabled) { background: #585858; }
         .btn-discard.show { display: inline-block; }
 
-        .combine-option {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            color: #d0d0d0;
-            background: #222;
-            border: 1px solid #3e3e3e;
-            border-radius: 6px;
-            padding: 8px 14px;
-            user-select: none;
-            transition: border-color 0.2s;
-        }
-
-        .combine-option:hover { border-color: #888; }
-
-        .combine-option.disabled {
-            opacity: 0.45;
-            cursor: not-allowed;
-            pointer-events: none;
-        }
-
-        .combine-option.compact {
-            padding: 5px 8px;
-            font-size: 12px;
-            gap: 4px;
-        }
-
-        .combine-option input[type="checkbox"],
-        .combine-option input[type="radio"] {
-            accent-color: #ccc;
-        }
 
         .btn-select {
             background: #2e2e2e;
@@ -1086,13 +1053,6 @@
             <div class="results-actions">
                 <button class="btn btn-select" onclick="selectAll()">Select All</button>
                 <button class="btn btn-select" onclick="selectNone()">Select None</button>
-                <label class="combine-option" id="combineLabel" title="Combine all clips into a single video file">
-                    <input type="checkbox" id="combineCheck" onchange="toggleCombineWarning()">
-                    <span>Combine into one video (max 10 clips)</span>
-                </label>
-                <div id="combineWarning" style="display:none; color:#b05555; font-size:12px; margin-top:6px; line-height:1.4;">
-                    If you can accomplish what you need without bulk downloads, please do. Large amounts of bulk downloads put a lot of stress on our bandwidth limits and could render the site unusable for a period of time.
-                </div>
                 <button class="btn btn-download" id="downloadBtn" onclick="doDownload()">
                     Download Selected
                 </button>
@@ -1202,7 +1162,6 @@
         <ul>
             <li><strong>Broadcast</strong> &mdash; Choose Home or Away camera feed.</li>
             <li><strong>Max videos</strong> &mdash; Set a limit, or leave at 0 for all results.</li>
-            <li><strong>Combine into one video</strong> <span style="background: #3e3e3e; color: #d0d0d0; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; vertical-align: middle;">COMING SOON</span> &mdash; Will merge all selected clips into a single file.</li>
         </ul>
 
         <h4>Downloading</h4>
@@ -1447,30 +1406,8 @@ function toggleAll(master) {
     updateSelectionCount();
 }
 
-function toggleCombineWarning() {
-    const checked = document.getElementById('combineCheck').checked;
-    document.getElementById('combineWarning').style.display = checked ? 'block' : 'none';
-}
-
 function updateSelectionCount() {
-    const count = document.querySelectorAll('.vid-check:checked').length;
-    const combineCheck = document.getElementById('combineCheck');
-    const combineLabel = document.getElementById('combineLabel');
-    const downloadBtn = document.getElementById('downloadBtn');
-
-    if (count > 10) {
-        combineCheck.checked = false;
-        combineCheck.disabled = true;
-        combineLabel.classList.add('disabled');
-        downloadBtn.disabled = true;
-        showStatus('Please select 10 or fewer clips. Downloads are limited to 10 clips at a time to manage bandwidth.', 'error');
-    } else {
-        combineCheck.disabled = false;
-        combineLabel.classList.remove('disabled');
-        downloadBtn.disabled = false;
-        hideStatus();
-    }
-    toggleCombineWarning();
+    // No-op; selection count tracking for future use
 }
 
 async function doDownload() {
@@ -1485,13 +1422,7 @@ async function doDownload() {
         return;
     }
 
-    if (selected.length > 10) {
-        showStatus('Please select 10 or fewer clips. Downloads are limited to 10 clips at a time to manage bandwidth.', 'error');
-        return;
-    }
-
     const broadcast = document.getElementById('broadcast').value;
-    const combine = document.getElementById('combineCheck').checked;
     const btn = document.getElementById('downloadBtn');
     btn.disabled = true;
 
@@ -1506,12 +1437,11 @@ async function doDownload() {
             '<span class="badge badge-ready">Queued</span>';
     });
 
-    // Start the job (download + optional combine/zip all handled server-side)
     try {
         const resp = await fetch('/api/download', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({videos: selected, broadcast: broadcast, combine: combine}),
+            body: JSON.stringify({videos: selected, broadcast: broadcast}),
         });
         const data = await resp.json();
 
@@ -1604,25 +1534,22 @@ function trackProgress(jobId) {
                 progBar.style.width = '100%';
                 progPct.textContent = '100%';
 
-                const isCombined = job.download_file.endsWith('.mp4');
-                const label = isCombined ? 'Combined video ready!' : 'Files packaged!';
-                progCurrent.textContent = label;
+                progCurrent.textContent = 'Files packaged!';
 
                 const saveBtn = document.getElementById('saveBtn');
-                saveBtn.textContent = isCombined ? 'Save Video to Computer' : 'Save Zip to Computer';
+                saveBtn.textContent = 'Save Zip to Computer';
                 saveBtn.classList.add('show');
                 document.getElementById('discardBtn').classList.add('show');
 
                 const msg = `Done! ${job.completed} clips processed. Click "Save" to download.`;
                 showStatus(msg, 'success');
             } else {
-                // Check if combine/zip failed
-                const combineResult = job.results.find(r =>
-                    r.filename === 'combined_video.mp4' || r.filename === 'savant_videos.zip');
-                if (combineResult && combineResult.status === 'failed') {
-                    progCurrent.textContent = 'Combine failed.';
-                    const errDetail = combineResult.error || 'Unknown error';
-                    showStatus(`Videos downloaded but combining failed: ${errDetail}`, 'error');
+                // Check if zip failed
+                const zipResult = job.results.find(r => r.filename === 'savant_videos.zip');
+                if (zipResult && zipResult.status === 'failed') {
+                    progCurrent.textContent = 'Packaging failed.';
+                    const errDetail = zipResult.error || 'Unknown error';
+                    showStatus(`Videos downloaded but packaging failed: ${errDetail}`, 'error');
                 } else {
                     progCurrent.textContent = 'Complete!';
                     if (job.failed > 0) {
