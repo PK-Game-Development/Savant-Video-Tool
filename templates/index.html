@@ -274,6 +274,18 @@
         .btn-discard:hover:not(:disabled) { background: #585858; }
         .btn-discard.show { display: inline-block; }
 
+        .btn-retry {
+            background: #2a1515;
+            color: #c06060;
+            padding: 14px 32px;
+            font-size: 16px;
+            display: none;
+            margin-left: 12px;
+            border: 1px solid #7a3535;
+        }
+        .btn-retry:hover:not(:disabled) { background: #3a1a1a; }
+        .btn-retry.show { display: inline-block; }
+
 
         .btn-select {
             background: #2e2e2e;
@@ -1040,6 +1052,7 @@
         <div class="progress-actions">
             <button class="btn btn-save" id="saveBtn" onclick="saveFile()">Save to Computer</button>
             <button class="btn btn-discard" id="discardBtn" onclick="discardJob()">Discard Files</button>
+            <button class="btn btn-retry" id="retryBtn" onclick="retryFailed()">Retry Failed</button>
         </div>
     </div>
 
@@ -1183,6 +1196,7 @@
 let videoData = [];
 let currentPlayerType = 'batter';
 let currentJobId = null;
+let lastJobData = null;
 
 const BATTING_PA = [
     {label: 'Single', event: 'single'},
@@ -1429,6 +1443,7 @@ async function doDownload() {
     hideStatus();
     document.getElementById('saveBtn').classList.remove('show');
     document.getElementById('discardBtn').classList.remove('show');
+    document.getElementById('retryBtn').classList.remove('show');
 
     // Mark selected rows as queued
     document.querySelectorAll('.vid-check:checked').forEach(cb => {
@@ -1454,6 +1469,55 @@ async function doDownload() {
         currentJobId = data.job_id;
         trackProgress(data.job_id);
 
+    } catch (err) {
+        showStatus('Network error: ' + err.message, 'error');
+        btn.disabled = false;
+    }
+}
+
+async function retryFailed() {
+    if (!lastJobData) return;
+    const failedFilenames = new Set(
+        (lastJobData.results || [])
+            .filter(r => r.status === 'failed' && r.filename !== 'savant_videos.zip')
+            .map(r => r.filename)
+    );
+    if (failedFilenames.size === 0) return;
+
+    const failedVideos = videoData.filter(v => failedFilenames.has(v.filename));
+    if (failedVideos.length === 0) return;
+
+    const broadcast = document.getElementById('broadcast').value;
+    const btn = document.getElementById('downloadBtn');
+    btn.disabled = true;
+
+    hideStatus();
+    document.getElementById('saveBtn').classList.remove('show');
+    document.getElementById('discardBtn').classList.remove('show');
+    document.getElementById('retryBtn').classList.remove('show');
+
+    // Reset failed video badges to queued
+    videoData.forEach((v, idx) => {
+        if (failedFilenames.has(v.filename)) {
+            const cell = document.getElementById('status-' + idx);
+            if (cell) cell.innerHTML = '<span class="badge badge-ready">Queued</span>';
+        }
+    });
+
+    try {
+        const resp = await fetch('/api/download', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({videos: failedVideos, broadcast: broadcast}),
+        });
+        const data = await resp.json();
+        if (!resp.ok) {
+            showStatus(data.error || 'Failed to start retry.', 'error');
+            btn.disabled = false;
+            return;
+        }
+        currentJobId = data.job_id;
+        trackProgress(data.job_id);
     } catch (err) {
         showStatus('Network error: ' + err.message, 'error');
         btn.disabled = false;
@@ -1569,6 +1633,17 @@ function trackProgress(jobId) {
                         showStatus(msg, 'success');
                     }
                 }
+            }
+
+            // Show retry button for any videos that actually failed
+            const failedVideoCount = job.results.filter(
+                r => r.status === 'failed' && r.filename !== 'savant_videos.zip'
+            ).length;
+            if (failedVideoCount > 0) {
+                lastJobData = job;
+                const retryBtn = document.getElementById('retryBtn');
+                retryBtn.textContent = `Retry Failed (${failedVideoCount})`;
+                retryBtn.classList.add('show');
             }
         }
     };

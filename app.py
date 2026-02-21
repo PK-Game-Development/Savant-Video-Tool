@@ -297,7 +297,7 @@ def _is_retryable(result):
         return False
     sc = result.get("status_code")
     err = result.get("error", "")
-    if sc is not None and (sc >= 500 or sc == 429 or sc == 403):
+    if sc is not None and (sc >= 500 or sc == 429 or sc == 403 or sc == 404):
         return True
     if "timed out" in err.lower() or "connection" in err.lower():
         return True
