@@ -53,6 +53,17 @@ SPORTY_VIDEO_URL = "https://baseballsavant.mlb.com/sporty-videos?playId={play_id
 MLB_PLAYER_SEARCH_URL = "https://statsapi.mlb.com/api/v1/people/search?names={name}&hydrate=currentTeam,xrefId"
 MLB_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}"
 
+# Maps MLB Stats API gameType codes to Statcast hfGT filter values
+_MLB_GAMETYPE_TO_HFGT = {
+    "R": "R",    # Regular Season
+    "S": "ST",   # Spring Training
+    "F": "F",    # Wild Card
+    "D": "D",    # Division Series
+    "L": "L",    # League Championship Series
+    "W": "W",    # World Series
+    "P": "PO",   # Postseason (generic)
+}
+
 # MLB team ID -> Fangraphs depth chart slug (team nickname only)
 FANGRAPHS_TEAM_SLUGS = {
     108: "angels",
@@ -583,7 +594,12 @@ def api_search():
 
 
 def _find_most_recent_game_date(session):
-    """Walk backwards from today to find the most recent date with Final MLB games."""
+    """Walk backwards from today to find the most recent date with Final MLB games.
+
+    Returns a tuple (date_str, hf_game_type) where hf_game_type is the Statcast
+    hfGT filter value (e.g. "R" for regular season, "ST" for spring training).
+    Returns (None, None) if no recent games are found.
+    """
     from datetime import timedelta
     today = datetime.now()
     for days_back in range(0, 14):
@@ -598,10 +614,12 @@ def _find_most_recent_game_date(session):
                 games = dates[0].get("games", [])
                 final_games = [g for g in games if g.get("status", {}).get("abstractGameState") == "Final"]
                 if final_games:
-                    return date_str
+                    mlb_type = final_games[0].get("gameType", "R")
+                    hf_type = _MLB_GAMETYPE_TO_HFGT.get(mlb_type, "R")
+                    return date_str, hf_type
         except Exception:
             continue
-    return None
+    return None, None
 
 
 @app.route("/api/highlights", methods=["GET"])
@@ -616,7 +634,7 @@ def api_highlights():
 
     session = create_session()
 
-    game_date = _find_most_recent_game_date(session)
+    game_date, hf_game_type = _find_most_recent_game_date(session)
     if not game_date:
         return jsonify({"error": "No recent MLB games found."}), 404
 
@@ -624,7 +642,7 @@ def api_highlights():
     csv_params = urlencode({
         "all": "true",
         "type": "details",
-        "hfGT": "R|",
+        "hfGT": f"{hf_game_type}|",
         "game_date_gt": game_date,
         "game_date_lt": game_date,
         "sortColumn": "delta_run_exp",
@@ -748,6 +766,7 @@ def api_highlights():
 
     result = {
         "game_date": game_date,
+        "game_type": hf_game_type,
         "videos": videos,
     }
     _highlights_cache = (time.time(), result)

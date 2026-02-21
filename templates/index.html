@@ -949,7 +949,7 @@
     <!-- Today's Highlights -->
     <div class="highlights-section" id="highlightsSection">
         <div class="highlights-header">
-            <h3>Today's Highlights</h3>
+            <h3 id="highlightsTitle">Today's Highlights</h3>
             <span class="highlights-date" id="highlightsDate"></span>
         </div>
         <div id="highlightsContent">
@@ -2292,6 +2292,9 @@ function exportGameLog() {
             const dateEl = document.getElementById('highlightsDate');
             const contentEl = document.getElementById('highlightsContent');
             dateEl.textContent = data.game_date || '';
+            if (data.game_type === 'ST') {
+                document.getElementById('highlightsTitle').textContent = 'Spring Training Highlights';
+            }
 
             if (!data.videos || data.videos.length === 0) {
                 contentEl.innerHTML = '<p class="highlights-error">No highlights available yet for this date.</p>';
