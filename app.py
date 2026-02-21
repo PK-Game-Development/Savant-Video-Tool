@@ -116,6 +116,9 @@ def create_session():
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/131.0.0.0 Safari/537.36"
         ),
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
     })
     retry_strategy = Retry(
         total=3,
@@ -124,7 +127,11 @@ def create_session():
         allowed_methods=["GET"],
         raise_on_status=False,
     )
-    adapter = HTTPAdapter(max_retries=retry_strategy)
+    adapter = HTTPAdapter(
+        max_retries=retry_strategy,
+        pool_connections=10,
+        pool_maxsize=10,
+    )
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return session
@@ -205,6 +212,10 @@ def download_video_file(url, output_path, session):
     headers = {
         "Origin": "https://www.mlb.com",
         "Referer": "https://www.mlb.com/",
+        "Accept": "video/mp4,video/*;q=0.9,*/*;q=0.8",
+        "Sec-Fetch-Dest": "video",
+        "Sec-Fetch-Mode": "no-cors",
+        "Sec-Fetch-Site": "cross-site",
     }
     resp = session.get(url, stream=True, timeout=(10, 120), headers=headers)
     resp.raise_for_status()
@@ -777,11 +788,13 @@ def api_download():
         session = create_session()
         job = jobs[job_id]
         downloaded_paths = []
+        download_delay = 1.0  # base delay between downloads (seconds)
+        consecutive_failures = 0
         logger.info("Job %s started: %d videos, broadcast=%s", job_id, len(videos), broadcast)
 
         try:
             # Phase 1: Download all videos
-            for video in videos:
+            for idx, video in enumerate(videos):
                 game_pk = video["game_pk"]
                 play_id = video["play_id"]
                 filename = video["filename"]
@@ -804,6 +817,10 @@ def api_download():
                     job["completed"] += 1
                     job["results"].append({"filename": filename, "status": "ok"})
                     downloaded_paths.append(output_path)
+                    consecutive_failures = 0
+                    # Gradually recover delay after successes
+                    if download_delay > 1.0:
+                        download_delay = max(1.0, download_delay * 0.8)
                 else:
                     job["failed"] += 1
                     entry = {"filename": filename, "status": "failed"}
@@ -817,7 +834,21 @@ def api_download():
                         except OSError:
                             pass
 
-                time.sleep(0.5)
+                    # Adaptive throttling: slow down when failures pile up
+                    consecutive_failures += 1
+                    if consecutive_failures >= 2:
+                        download_delay = min(5.0, download_delay * 1.5)
+                        logger.info(
+                            "Job %s: %d consecutive failures, increasing delay to %.1fs",
+                            job_id, consecutive_failures, download_delay,
+                        )
+                    # Recreate session after 3+ consecutive failures (stale connection)
+                    if consecutive_failures >= 3:
+                        logger.info("Job %s: recreating session after %d failures", job_id, consecutive_failures)
+                        session = create_session()
+
+                if idx < len(videos) - 1:
+                    time.sleep(download_delay)
 
             # Phase 2: Zip all individual files
             if downloaded_paths:
