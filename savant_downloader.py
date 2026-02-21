@@ -131,7 +131,12 @@ def fetch_national_broadcast_slugs(game_pk, session):
         for game in date_entry.get("games", []):
             if str(game.get("gamePk", "")) == str(game_pk):
                 for bc in game.get("broadcasts", []):
-                    if bc.get("homeAway") == "national" or bc.get("isNational"):
+                    # isNational=True identifies national TV networks (ESPN, FOX,
+                    # TBS, FS1, etc.). homeAway for these entries is still "home"
+                    # or "away", so that check is not useful here. Filter type=="TV"
+                    # to skip national radio feeds (e.g. ESPN Radio) which also
+                    # carry isNational=True but have no video CDN path.
+                    if bc.get("isNational") and bc.get("type") == "TV":
                         name = bc.get("shortName") or bc.get("name", "")
                         if name:
                             slug = name.lower().replace(" ", "").replace("+", "plus")
