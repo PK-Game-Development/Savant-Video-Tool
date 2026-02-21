@@ -166,10 +166,11 @@ def download_video(url, output_path, session):
 
 def try_download_video(game_pk, play_id, broadcast, output_path, session):
     """
-    Try downloading a video, falling back to the other broadcast angle.
+    Try downloading a video, falling back to the other broadcast angle then national.
+    Nationally televised games use "national" on the CDN instead of home/away.
     Returns True on success, False on failure.
     """
-    broadcasts = [broadcast, "away" if broadcast == "home" else "home"]
+    broadcasts = [broadcast, "away" if broadcast == "home" else "home", "national"]
 
     for bc in broadcasts:
         video_url = VIDEO_CDN_URL.format(

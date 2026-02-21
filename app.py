@@ -260,11 +260,15 @@ def download_video_file(url, output_path, session):
 
 
 def try_download(game_pk, play_id, broadcast, output_path, session):
-    """Attempt to download a video clip, trying both broadcast angles.
+    """Attempt to download a video clip, trying home/away then national broadcast.
+
+    Nationally televised games (ESPN, FOX, TBS, etc.) are stored under the
+    "national" broadcast slot on the CDN rather than home/away. This function
+    tries the user's preferred angle first, then the opposite, then national.
 
     Returns dict: {"success": bool, "error": str|None, "status_code": int|None}
     """
-    broadcasts = [broadcast, "away" if broadcast == "home" else "home"]
+    broadcasts = [broadcast, "away" if broadcast == "home" else "home", "national"]
     last_error = None
     last_status = None
 
