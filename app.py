@@ -52,6 +52,7 @@ VIDEO_CDN_URL = "https://fastball-clips.mlb.com/{game_pk}/{broadcast}/{play_id}.
 SPORTY_VIDEO_URL = "https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
 MLB_PLAYER_SEARCH_URL = "https://statsapi.mlb.com/api/v1/people/search?names={name}&hydrate=currentTeam,xrefId"
 MLB_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}"
+MLB_GAME_BROADCASTS_URL = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gamePk={game_pk}&hydrate=broadcasts(all)"
 
 # Maps MLB Stats API gameType codes to Statcast hfGT filter values
 _MLB_GAMETYPE_TO_HFGT = {
@@ -202,6 +203,36 @@ def fetch_game_play_ids(game_pk, session):
     return play_id_map, matchup_map, duration_map
 
 
+def fetch_national_broadcast_slugs(game_pk, session):
+    """Return CDN broadcast slugs for national broadcasts of this game.
+
+    For nationally televised games the CDN stores clips under the network's
+    short name (e.g. "espn", "fox", "tbs") rather than "home" or "away".
+    Returns a list of lowercase slugs to try, e.g. ["espn"].
+    Returns [] for regional (home/away only) games.
+    """
+    try:
+        url = MLB_GAME_BROADCASTS_URL.format(game_pk=game_pk)
+        resp = session.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        return []
+
+    slugs = []
+    for date_entry in data.get("dates", []):
+        for game in date_entry.get("games", []):
+            if str(game.get("gamePk", "")) == str(game_pk):
+                for bc in game.get("broadcasts", []):
+                    if bc.get("homeAway") == "national" or bc.get("isNational"):
+                        name = bc.get("shortName") or bc.get("name", "")
+                        if name:
+                            slug = name.lower().replace(" ", "").replace("+", "plus")
+                            if slug and slug not in slugs:
+                                slugs.append(slug)
+    return slugs
+
+
 def sanitize_filename(name):
     return re.sub(r"[^\w\s\-.]", "", str(name)).strip().replace(" ", "_")
 
@@ -259,16 +290,22 @@ def download_video_file(url, output_path, session):
     logger.info("Downloaded %s (%d bytes)", os.path.basename(output_path), bytes_written)
 
 
-def try_download(game_pk, play_id, broadcast, output_path, session):
-    """Attempt to download a video clip, trying home/away then national broadcast.
+def try_download(game_pk, play_id, broadcast, output_path, session, national_slugs=None):
+    """Attempt to download a video clip, trying home/away then national network slugs.
 
-    Nationally televised games (ESPN, FOX, TBS, etc.) are stored under the
-    "national" broadcast slot on the CDN rather than home/away. This function
-    tries the user's preferred angle first, then the opposite, then national.
+    For nationally televised games (ESPN, FOX, TBS, etc.) the CDN stores clips
+    under the network's short name (e.g. "espn", "fox") rather than home/away.
+    Pass national_slugs from fetch_national_broadcast_slugs() to try the correct
+    network slug. Falls back to "national" and "network" as generic catch-alls.
 
     Returns dict: {"success": bool, "error": str|None, "status_code": int|None}
     """
-    broadcasts = [broadcast, "away" if broadcast == "home" else "home", "national"]
+    base = [broadcast, "away" if broadcast == "home" else "home"]
+    extras = [s for s in (national_slugs or []) if s not in base]
+    for generic in ("national", "network"):
+        if generic not in base and generic not in extras:
+            extras.append(generic)
+    broadcasts = base + extras
     last_error = None
     last_status = None
 
@@ -319,9 +356,9 @@ def _is_retryable(result):
     return False
 
 
-def try_download_with_retry(game_pk, play_id, broadcast, output_path, session):
+def try_download_with_retry(game_pk, play_id, broadcast, output_path, session, national_slugs=None):
     """Download with retry and exponential backoff + jitter for transient errors."""
-    result = try_download(game_pk, play_id, broadcast, output_path, session)
+    result = try_download(game_pk, play_id, broadcast, output_path, session, national_slugs)
     if result["success"] or not _is_retryable(result):
         return result
 
@@ -340,7 +377,7 @@ def try_download_with_retry(game_pk, play_id, broadcast, output_path, session):
                 os.remove(output_path)
             except OSError:
                 pass
-        result = try_download(game_pk, play_id, broadcast, output_path, session)
+        result = try_download(game_pk, play_id, broadcast, output_path, session, national_slugs)
         if result["success"] or not _is_retryable(result):
             break
 
@@ -815,6 +852,16 @@ def api_download():
         consecutive_failures = 0
         logger.info("Job %s started: %d videos, broadcast=%s", job_id, len(videos), broadcast)
 
+        # Pre-fetch national broadcast slugs once per unique game so each clip
+        # in a nationally televised game can try the correct network CDN path
+        # (e.g. "espn", "fox") rather than failing on home/away 404s.
+        game_national_slugs = {}
+        for gp in {v["game_pk"] for v in videos}:
+            slugs = fetch_national_broadcast_slugs(gp, session)
+            game_national_slugs[gp] = slugs
+            if slugs:
+                logger.info("Game %s national broadcast slugs: %s", gp, slugs)
+
         try:
             # Phase 1: Download all videos
             for idx, video in enumerate(videos):
@@ -826,8 +873,9 @@ def api_download():
                 job["current"] = f"{video.get('player', '')} - {video.get('date', '')}"
 
                 try:
+                    national_slugs = game_national_slugs.get(game_pk, [])
                     result = try_download_with_retry(
-                        game_pk, play_id, broadcast, output_path, session
+                        game_pk, play_id, broadcast, output_path, session, national_slugs
                     )
                 except Exception as e:
                     result = {

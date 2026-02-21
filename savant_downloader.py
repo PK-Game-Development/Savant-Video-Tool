@@ -32,6 +32,7 @@ STATCAST_CSV_BASE = "https://baseballsavant.mlb.com/statcast_search/csv"
 MLB_GAME_FEED_URL = "https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live"
 VIDEO_CDN_URL = "https://fastball-clips.mlb.com/{game_pk}/{broadcast}/{play_id}.mp4"
 SPORTY_VIDEO_URL = "https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
+MLB_GAME_BROADCASTS_URL = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&gamePk={game_pk}&hydrate=broadcasts(all)"
 
 
 def create_session():
@@ -109,6 +110,36 @@ def fetch_game_play_ids(game_pk, session):
     return play_id_map, matchup_map
 
 
+def fetch_national_broadcast_slugs(game_pk, session):
+    """Return CDN broadcast slugs for national broadcasts of this game.
+
+    For nationally televised games the CDN stores clips under the network's
+    short name (e.g. "espn", "fox", "tbs") rather than "home" or "away".
+    Returns a list of lowercase slugs to try, e.g. ["espn"].
+    Returns [] for regional (home/away only) games.
+    """
+    try:
+        url = MLB_GAME_BROADCASTS_URL.format(game_pk=game_pk)
+        resp = session.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception:
+        return []
+
+    slugs = []
+    for date_entry in data.get("dates", []):
+        for game in date_entry.get("games", []):
+            if str(game.get("gamePk", "")) == str(game_pk):
+                for bc in game.get("broadcasts", []):
+                    if bc.get("homeAway") == "national" or bc.get("isNational"):
+                        name = bc.get("shortName") or bc.get("name", "")
+                        if name:
+                            slug = name.lower().replace(" ", "").replace("+", "plus")
+                            if slug and slug not in slugs:
+                                slugs.append(slug)
+    return slugs
+
+
 def sanitize_filename(name):
     """Remove characters that aren't safe for filenames."""
     return re.sub(r"[^\w\s\-.]", "", str(name)).strip().replace(" ", "_")
@@ -164,13 +195,19 @@ def download_video(url, output_path, session):
     return True
 
 
-def try_download_video(game_pk, play_id, broadcast, output_path, session):
+def try_download_video(game_pk, play_id, broadcast, output_path, session, national_slugs=None):
     """
-    Try downloading a video, falling back to the other broadcast angle then national.
-    Nationally televised games use "national" on the CDN instead of home/away.
+    Try downloading a video, falling back to the other broadcast angle then national network slugs.
+    For nationally televised games the CDN uses the network short name (e.g. "espn", "fox").
+    Pass national_slugs from fetch_national_broadcast_slugs() to try the correct slug.
     Returns True on success, False on failure.
     """
-    broadcasts = [broadcast, "away" if broadcast == "home" else "home", "national"]
+    base = [broadcast, "away" if broadcast == "home" else "home"]
+    extras = [s for s in (national_slugs or []) if s not in base]
+    for generic in ("national", "network"):
+        if generic not in base and generic not in extras:
+            extras.append(generic)
+    broadcasts = base + extras
 
     for bc in broadcasts:
         video_url = VIDEO_CDN_URL.format(
@@ -259,6 +296,7 @@ def main():
     print("Fetching play IDs from MLB Stats API...")
 
     game_play_maps = {}
+    game_national_slugs = {}
     for i, game_pk in enumerate(games, 1):
         try:
             play_map, _matchup_map = fetch_game_play_ids(game_pk, session)
@@ -267,6 +305,10 @@ def main():
         except Exception as e:
             print(f"  [{i}/{len(games)}] Game {game_pk}: failed ({e})")
             game_play_maps[game_pk] = {}
+        slugs = fetch_national_broadcast_slugs(game_pk, session)
+        game_national_slugs[game_pk] = slugs
+        if slugs:
+            print(f"  [{i}/{len(games)}] Game {game_pk}: national broadcast slugs: {slugs}")
         time.sleep(0.3)
 
     # --- Step 3: Resolve play IDs for each search result ---
@@ -335,8 +377,9 @@ def main():
 
         print(f"[{i}/{len(resolved)}] {label}")
 
+        national_slugs = game_national_slugs.get(game_pk, [])
         success = try_download_video(
-            game_pk, play_id, args.broadcast, output_path, session
+            game_pk, play_id, args.broadcast, output_path, session, national_slugs
         )
 
         if success:
