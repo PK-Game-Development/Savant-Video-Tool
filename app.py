@@ -259,18 +259,18 @@ def download_video_file(url, output_path, session):
     logger.info("Downloaded %s (%d bytes)", os.path.basename(output_path), bytes_written)
 
 
-def try_download(game_pk, play_id, broadcast, output_path, session, include_network=False):
-    """Attempt to download a video clip, trying home/away and optionally national slugs.
+def try_download(game_pk, play_id, broadcast, output_path, session):
+    """Attempt to download a video clip, trying home/away then network slugs.
 
-    For postseason and other nationally televised games the CDN stores clips under
-    the "network" slug rather than "home"/"away". Set include_network=True when the
-    game_type indicates a non-regular-season game (anything other than R/S/E).
+    The CDN stores clips under "home"/"away" for most games, but nationally
+    televised games (ESPN Sunday Night Baseball, FOX Saturday, postseason, etc.)
+    may only have clips under "network". We always try network/national as
+    fallbacks to handle both regular-season national broadcasts and postseason.
 
     Returns dict: {"success": bool, "error": str|None, "status_code": int|None}
     """
-    broadcasts = [broadcast, "away" if broadcast == "home" else "home"]
-    if include_network:
-        broadcasts += ["national", "network"]
+    broadcasts = [broadcast, "away" if broadcast == "home" else "home",
+                  "network", "national"]
     last_error = None
     last_status = None
 
@@ -321,9 +321,9 @@ def _is_retryable(result):
     return False
 
 
-def try_download_with_retry(game_pk, play_id, broadcast, output_path, session, include_network=False):
+def try_download_with_retry(game_pk, play_id, broadcast, output_path, session):
     """Download with retry and exponential backoff + jitter for transient errors."""
-    result = try_download(game_pk, play_id, broadcast, output_path, session, include_network)
+    result = try_download(game_pk, play_id, broadcast, output_path, session)
     if result["success"] or not _is_retryable(result):
         return result
 
@@ -342,7 +342,7 @@ def try_download_with_retry(game_pk, play_id, broadcast, output_path, session, i
                 os.remove(output_path)
             except OSError:
                 pass
-        result = try_download(game_pk, play_id, broadcast, output_path, session, include_network)
+        result = try_download(game_pk, play_id, broadcast, output_path, session)
         if result["success"] or not _is_retryable(result):
             break
 
@@ -828,15 +828,9 @@ def api_download():
 
                 job["current"] = f"{video.get('player', '')} - {video.get('date', '')}"
 
-                # Postseason and other non-regular-season games are nationally
-                # broadcast; the CDN stores those clips under "network" rather
-                # than "home"/"away". Regular season games always have home/away.
-                game_type = video.get("game_type", "R")
-                include_network = game_type not in ("R", "S", "E")
-
                 try:
                     result = try_download_with_retry(
-                        game_pk, play_id, broadcast, output_path, session, include_network
+                        game_pk, play_id, broadcast, output_path, session
                     )
                 except Exception as e:
                     result = {
