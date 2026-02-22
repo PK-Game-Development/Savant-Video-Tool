@@ -162,16 +162,15 @@ def download_video(url, output_path, session):
     return True
 
 
-def try_download_video(game_pk, play_id, broadcast, output_path, session, include_network=False):
+def try_download_video(game_pk, play_id, broadcast, output_path, session):
     """
-    Try downloading a video, falling back to the other broadcast angle.
-    For postseason and other nationally televised games set include_network=True
-    to also try the "network" CDN slug (the universal path for national broadcasts).
+    Try downloading a video, falling back to other broadcast angles.
+    Always tries network/national as fallbacks to handle ESPN, FOX, and
+    other national broadcasts during the regular season and postseason.
     Returns True on success, False on failure.
     """
-    broadcasts = [broadcast, "away" if broadcast == "home" else "home"]
-    if include_network:
-        broadcasts += ["national", "network"]
+    broadcasts = [broadcast, "away" if broadcast == "home" else "home",
+                  "network", "national"]
 
     for bc in broadcasts:
         video_url = VIDEO_CDN_URL.format(
@@ -336,10 +335,8 @@ def main():
 
         print(f"[{i}/{len(resolved)}] {label}")
 
-        game_type = row.get("game_type", "R")
-        include_network = game_type not in ("R", "S", "E")
         success = try_download_video(
-            game_pk, play_id, args.broadcast, output_path, session, include_network
+            game_pk, play_id, args.broadcast, output_path, session
         )
 
         if success:
