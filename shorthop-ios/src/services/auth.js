@@ -12,7 +12,6 @@
  */
 
 import * as AppleAuthentication from "expo-apple-authentication";
-import * as WebBrowser from "expo-web-browser";
 import * as Google from "expo-auth-session/providers/google";
 import {
   signInWithCredential,
@@ -21,8 +20,6 @@ import {
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { auth } from "./firebase";
-
-WebBrowser.maybeCompleteAuthSession();
 
 // Replace with your Google OAuth Web Client ID from Firebase Console
 const GOOGLE_WEB_CLIENT_ID =

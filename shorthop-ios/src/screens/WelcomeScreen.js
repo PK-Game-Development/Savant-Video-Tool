@@ -4,6 +4,10 @@
  */
 
 import React, { useEffect, useState } from "react";
+import * as WebBrowser from "expo-web-browser";
+
+// Must be called at module level in the screen that handles the OAuth redirect
+WebBrowser.maybeCompleteAuthSession();
 import {
   View,
   Text,
