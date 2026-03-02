@@ -39,7 +39,11 @@ try {
   });
 } catch (e) {
   console.error("[firebase] initializeAuth error:", e);
-  auth = getAuth(app);
+  try {
+    auth = getAuth(app);
+  } catch (e2) {
+    console.error("[firebase] getAuth fallback also failed:", e2);
+  }
 }
 
 export { auth };
