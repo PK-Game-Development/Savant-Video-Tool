@@ -15,8 +15,17 @@ import { eventLabel } from "../constants/teams";
 
 const BROADCASTS = ["home", "away"];
 
-function cdnUrl(gamePk, playId, broadcast) {
-  return `https://fastball-clips.mlb.com/${gamePk}/${broadcast}/${playId}.mp4`;
+// MLB's CDN requires these headers or it redirects to a search page instead of the video.
+const CDN_HEADERS = {
+  Origin: "https://www.mlb.com",
+  Referer: "https://www.mlb.com/",
+};
+
+function cdnSource(gamePk, playId, broadcast) {
+  return {
+    uri: `https://fastball-clips.mlb.com/${gamePk}/${broadcast}/${playId}.mp4`,
+    headers: CDN_HEADERS,
+  };
 }
 
 export default function VideoMomentCard({ moment, onLongPress }) {
@@ -37,7 +46,7 @@ export default function VideoMomentCard({ moment, onLongPress }) {
         if (next < BROADCASTS.length) {
           broadcastIdx.current = next;
           player
-            .replaceAsync({ uri: cdnUrl(moment.gamePk, moment.playId, BROADCASTS[next]) })
+            .replaceAsync(cdnSource(moment.gamePk, moment.playId, BROADCASTS[next]))
             .catch(() => setHasError(true));
         } else {
           setHasError(true);
@@ -58,7 +67,7 @@ export default function VideoMomentCard({ moment, onLongPress }) {
     setHasError(false);
     setActive(true);
     player
-      .replaceAsync({ uri: cdnUrl(moment.gamePk, moment.playId, BROADCASTS[0]) })
+      .replaceAsync(cdnSource(moment.gamePk, moment.playId, BROADCASTS[0]))
       .catch(() => setHasError(true));
   }
 
