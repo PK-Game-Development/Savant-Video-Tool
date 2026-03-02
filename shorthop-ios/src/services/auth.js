@@ -21,9 +21,13 @@ import {
 } from "firebase/auth";
 import { auth } from "./firebase";
 
-// Replace with your Google OAuth Web Client ID from Firebase Console
+// Replace with your Google OAuth client IDs from Google Cloud Console
+// Web Client ID: Firebase Console → Authentication → Google → Web SDK configuration
+// iOS Client ID: Google Cloud Console → Credentials → your iOS OAuth client
 const GOOGLE_WEB_CLIENT_ID =
   "YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com";
+const GOOGLE_IOS_CLIENT_ID =
+  "YOUR_GOOGLE_IOS_CLIENT_ID.apps.googleusercontent.com";
 
 // ─── Apple ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +60,7 @@ export async function signInWithApple() {
 export function useGoogleAuth() {
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: GOOGLE_WEB_CLIENT_ID,
+    iosClientId: GOOGLE_IOS_CLIENT_ID,
     selectAccount: true,
   });
 
