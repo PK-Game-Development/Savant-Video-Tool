@@ -39,6 +39,20 @@ from flask import (
 
 app = Flask(__name__)
 
+
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
+    return response
+
+
+@app.route("/api/<path:path>", methods=["OPTIONS"])
+def options_handler(path):
+    return "", 204
+
+
 logger = logging.getLogger("savant_dl")
 logging.basicConfig(
     level=logging.INFO,
@@ -582,89 +596,8 @@ def api_search():
     })
 
 
-def _find_most_recent_game_date(session):
-    """Walk backwards from today to find the most recent date with Final MLB games."""
-    from datetime import timedelta
-    today = datetime.now()
-    for days_back in range(0, 14):
-        check = today - timedelta(days=days_back)
-        date_str = check.strftime("%Y-%m-%d")
-        try:
-            resp = session.get(MLB_SCHEDULE_URL.format(date=date_str), timeout=15)
-            resp.raise_for_status()
-            data = resp.json()
-            dates = data.get("dates", [])
-            if dates:
-                games = dates[0].get("games", [])
-                final_games = [g for g in games if g.get("status", {}).get("abstractGameState") == "Final"]
-                if final_games:
-                    return date_str
-        except Exception:
-            continue
-    return None
-
-
-@app.route("/api/highlights", methods=["GET"])
-def api_highlights():
-    """Return top plays from the most recent MLB day, sorted by Win Probability Added."""
-    global _highlights_cache
-
-    # Serve from cache if fresh
-    cache_ts, cache_data = _highlights_cache
-    if cache_data is not None and (time.time() - cache_ts) < _HIGHLIGHTS_CACHE_TTL:
-        return jsonify(cache_data)
-
-    session = create_session()
-
-    game_date = _find_most_recent_game_date(session)
-    if not game_date:
-        return jsonify({"error": "No recent MLB games found."}), 404
-
-    # Build Statcast CSV URL for that date — fetch all pitches with events (plate appearance results)
-    csv_params = urlencode({
-        "all": "true",
-        "type": "details",
-        "hfGT": "R|",
-        "game_date_gt": game_date,
-        "game_date_lt": game_date,
-        "sortColumn": "delta_run_exp",
-        "sortOrder": "desc",
-        "player_type": "batter",
-        "min_results": "0",
-    }, doseq=True)
-    csv_url = f"{STATCAST_CSV_BASE}?{csv_params}"
-
-    try:
-        resp = session.get(csv_url, timeout=120)
-        resp.raise_for_status()
-        text = resp.text.strip()
-        if not text:
-            return jsonify({"error": "No Statcast data for this date yet."}), 404
-        reader = csv.DictReader(io.StringIO(text))
-        rows = list(reader)
-    except Exception as e:
-        return jsonify({"error": f"Failed to fetch highlights: {e}"}), 500
-
-    if not rows:
-        return jsonify({"error": "No Statcast data for this date yet."}), 404
-
-    # Filter to only rows that have a plate appearance result (events field) and WPA
-    pa_rows = []
-    for row in rows:
-        event = row.get("events", "").strip()
-        wpa_str = row.get("delta_run_exp", "").strip()
-        if event and wpa_str:
-            try:
-                row["_wpa"] = float(wpa_str)
-            except ValueError:
-                continue
-            pa_rows.append(row)
-
-    # Sort by absolute WPA descending and take top 15
-    pa_rows.sort(key=lambda r: abs(r["_wpa"]), reverse=True)
-    pa_rows = pa_rows[:15]
-
-    # Resolve play IDs (same flow as /api/search)
+def _resolve_pa_rows_to_videos(pa_rows, session):
+    """Given a list of plate-appearance CSV rows with _wpa set, resolve play IDs and return video objects."""
     games = defaultdict(list)
     for row in pa_rows:
         gp = row.get("game_pk", "")
@@ -717,10 +650,7 @@ def api_highlights():
         pitcher_name = matchup[1]
 
         dur_secs = game_duration_maps.get(game_pk, {}).get((ab_num, pitch_num))
-        if dur_secs is not None:
-            duration_str = f"{dur_secs // 60}:{dur_secs % 60:02d}"
-        else:
-            duration_str = ""
+        duration_str = f"{dur_secs // 60}:{dur_secs % 60:02d}" if dur_secs is not None else ""
 
         wpa = row.get("_wpa", 0)
         wpa_display = f"+{wpa:.2f}" if wpa >= 0 else f"{wpa:.2f}"
@@ -746,12 +676,178 @@ def api_highlights():
             "savant_url": SPORTY_VIDEO_URL.format(play_id=play_id),
         })
 
+    return videos
+
+
+def _find_most_recent_game_date(session):
+    """Walk backwards from today to find the most recent date with Final MLB games."""
+    from datetime import timedelta
+    today = datetime.now()
+    for days_back in range(0, 14):
+        check = today - timedelta(days=days_back)
+        date_str = check.strftime("%Y-%m-%d")
+        try:
+            resp = session.get(MLB_SCHEDULE_URL.format(date=date_str), timeout=15)
+            resp.raise_for_status()
+            data = resp.json()
+            dates = data.get("dates", [])
+            if dates:
+                games = dates[0].get("games", [])
+                final_games = [g for g in games if g.get("status", {}).get("abstractGameState") == "Final"]
+                if final_games:
+                    return date_str
+        except Exception:
+            continue
+    return None
+
+
+@app.route("/api/highlights", methods=["GET"])
+def api_highlights():
+    """Return top plays from an MLB day, sorted by Win Probability Added.
+
+    Query params:
+        date  (str): YYYY-MM-DD. Defaults to most recent game date.
+        team  (str): 3-letter team code (e.g. NYY). Filters to plays involving that team.
+        limit (int): Max plays to return. Defaults to 15.
+    """
+    global _highlights_cache
+
+    date_param = request.args.get("date", "").strip()
+    team_param = request.args.get("team", "").strip().upper()
+    try:
+        limit = max(1, min(50, int(request.args.get("limit", "15"))))
+    except ValueError:
+        limit = 15
+
+    # Only cache the default no-param request
+    use_cache = not date_param and not team_param
+    if use_cache:
+        cache_ts, cache_data = _highlights_cache
+        if cache_data is not None and (time.time() - cache_ts) < _HIGHLIGHTS_CACHE_TTL:
+            return jsonify(cache_data)
+
+    session = create_session()
+
+    if date_param:
+        game_date = date_param
+    else:
+        game_date = _find_most_recent_game_date(session)
+        if not game_date:
+            return jsonify({"error": "No recent MLB games found."}), 404
+
+    csv_params = {
+        "all": "true",
+        "type": "details",
+        "hfGT": "R|",
+        "game_date_gt": game_date,
+        "game_date_lt": game_date,
+        "sortColumn": "delta_run_exp",
+        "sortOrder": "desc",
+        "player_type": "batter",
+        "min_results": "0",
+    }
+    if team_param:
+        csv_params["hfTeam"] = f"{team_param}|"
+
+    csv_url = f"{STATCAST_CSV_BASE}?{urlencode(csv_params, doseq=True)}"
+
+    try:
+        resp = session.get(csv_url, timeout=120)
+        resp.raise_for_status()
+        text = resp.text.strip()
+        if not text:
+            return jsonify({"error": "No Statcast data for this date yet."}), 404
+        reader = csv.DictReader(io.StringIO(text))
+        rows = list(reader)
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch highlights: {e}"}), 500
+
+    if not rows:
+        return jsonify({"error": "No Statcast data for this date yet."}), 404
+
+    pa_rows = []
+    for row in rows:
+        event = row.get("events", "").strip()
+        wpa_str = row.get("delta_run_exp", "").strip()
+        if event and wpa_str:
+            try:
+                row["_wpa"] = float(wpa_str)
+            except ValueError:
+                continue
+            pa_rows.append(row)
+
+    pa_rows.sort(key=lambda r: abs(r["_wpa"]), reverse=True)
+    pa_rows = pa_rows[:limit]
+
+    videos = _resolve_pa_rows_to_videos(pa_rows, session)
+
     result = {
         "game_date": game_date,
         "videos": videos,
     }
-    _highlights_cache = (time.time(), result)
+    if use_cache:
+        _highlights_cache = (time.time(), result)
     return jsonify(result)
+
+
+@app.route("/api/player-plays", methods=["GET"])
+def api_player_plays():
+    """Return plate appearance plays for a specific player on a given date.
+
+    Query params:
+        mlb_id (int): MLB player ID.
+        date   (str): YYYY-MM-DD.
+    """
+    mlb_id = request.args.get("mlb_id", "").strip()
+    date_param = request.args.get("date", "").strip()
+
+    if not mlb_id or not date_param:
+        return jsonify({"error": "mlb_id and date are required"}), 400
+
+    try:
+        datetime.strptime(date_param, "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "Invalid date format. Use YYYY-MM-DD"}), 400
+
+    session = create_session()
+
+    csv_params = {
+        "all": "true",
+        "type": "details",
+        "hfGT": "R|",
+        "game_date_gt": date_param,
+        "game_date_lt": date_param,
+        "player_id": mlb_id,
+        "player_type": "batter",
+        "min_results": "0",
+    }
+    csv_url = f"{STATCAST_CSV_BASE}?{urlencode(csv_params, doseq=True)}"
+
+    try:
+        resp = session.get(csv_url, timeout=120)
+        resp.raise_for_status()
+        text = resp.text.strip()
+        if not text:
+            return jsonify({"game_date": date_param, "videos": []}), 200
+        reader = csv.DictReader(io.StringIO(text))
+        rows = list(reader)
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch player plays: {e}"}), 500
+
+    pa_rows = []
+    for row in rows:
+        if row.get("events", "").strip():
+            wpa_str = row.get("delta_run_exp", "").strip()
+            try:
+                row["_wpa"] = float(wpa_str) if wpa_str else 0.0
+            except ValueError:
+                row["_wpa"] = 0.0
+            pa_rows.append(row)
+
+    pa_rows.sort(key=lambda r: abs(r["_wpa"]), reverse=True)
+    videos = _resolve_pa_rows_to_videos(pa_rows, session)
+
+    return jsonify({"game_date": date_param, "videos": videos})
 
 
 @app.route("/api/download", methods=["POST"])
