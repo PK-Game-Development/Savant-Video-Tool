@@ -23,6 +23,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { getHighlights, searchPlayers, getPlayerPlays } from "../services/savantApi";
 import { saveMoment, getSavedPlayIds } from "../services/moments";
+import { invalidateMoments } from "../services/prefetch";
 import PlayCard from "../components/PlayCard";
 import colors from "../constants/colors";
 import { TEAMS } from "../constants/teams";
@@ -130,6 +131,7 @@ export default function AddMomentScreen({ route, navigation }) {
     setSaving(video.play_id);
     try {
       await saveMoment(video, { isAutoSaved: false, autoSaveType: null });
+      invalidateMoments(date);
       setSavedPlayIds((prev) => new Set([...prev, video.play_id]));
     } catch (err) {
       Alert.alert("Error saving moment", err.message);

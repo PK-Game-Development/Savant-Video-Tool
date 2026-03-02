@@ -11,7 +11,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  Linking,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -46,6 +45,7 @@ export default function DayScreen({ route, navigation }) {
     } catch {
       setMoments([]);
     } finally {
+      invalidateMoments(date); // clear cache after first use so re-focus always fetches fresh
       setLoading(false);
     }
   }
@@ -71,14 +71,6 @@ export default function DayScreen({ route, navigation }) {
         },
       ]
     );
-  }
-
-  function openSavantUrl(moment) {
-    if (moment.savantUrl) {
-      Linking.openURL(moment.savantUrl).catch(() =>
-        Alert.alert("Could not open link")
-      );
-    }
   }
 
   function renderEmpty() {

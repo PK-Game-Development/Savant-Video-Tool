@@ -1,58 +1,73 @@
 /**
  * VideoMomentCard — moment card with an embedded tap-to-play video.
  *
- * Video source: fastball-clips.mlb.com CDN (direct MP4, no extra API call).
+ * Video source: fastball-clips.mlb.com CDN (direct MP4, no proxy needed).
  * Tries the home broadcast first; falls back to away on error.
- * Long-press triggers delete (same as MomentCard).
+ * Long-press triggers delete. Tap "View on Savant" to open in browser.
  */
 
-import React, { useState, useRef, useEffect } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useState, useEffect, useRef } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "../constants/colors";
 import { eventLabel } from "../constants/teams";
 
-const CDN = "https://fastball-clips.mlb.com";
+const BROADCASTS = ["home", "away"];
 
-function buildUrl(gamePk, playId, broadcast) {
-  return `${CDN}/${gamePk}/${broadcast}/${playId}.mp4`;
+function cdnUrl(gamePk, playId, broadcast) {
+  return `https://fastball-clips.mlb.com/${gamePk}/${broadcast}/${playId}.mp4`;
 }
 
 export default function VideoMomentCard({ moment, onLongPress }) {
   const [active, setActive] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const triedAway = useRef(false);
+  const broadcastIdx = useRef(0);
 
   const player = useVideoPlayer(null, (p) => {
     p.loop = false;
   });
 
-  // Home → away fallback on error
+  // Attach listener at mount so no status events are ever missed.
   useEffect(() => {
-    if (!active) return;
     const sub = player.addListener("statusChange", ({ status, error }) => {
-      if (error && !triedAway.current && moment.gamePk && moment.playId) {
-        triedAway.current = true;
-        player.replace({ uri: buildUrl(moment.gamePk, moment.playId, "away") });
+      if (status === "error" || error) {
+        // Try the next broadcast (home → away) before giving up.
+        const next = broadcastIdx.current + 1;
+        if (next < BROADCASTS.length) {
+          broadcastIdx.current = next;
+          player
+            .replaceAsync({ uri: cdnUrl(moment.gamePk, moment.playId, BROADCASTS[next]) })
+            .catch(() => setHasError(true));
+        } else {
+          setHasError(true);
+        }
+      } else if (status === "readyToPlay") {
         player.play();
-      } else if (error) {
-        setHasError(true);
       }
     });
     return () => sub.remove();
-  }, [active, player, moment.gamePk, moment.playId]);
+  }, [player, moment.gamePk, moment.playId]);
 
   function activate() {
     if (!moment.gamePk || !moment.playId) {
       setHasError(true);
       return;
     }
-    triedAway.current = false;
+    broadcastIdx.current = 0;
     setHasError(false);
     setActive(true);
-    player.replace({ uri: buildUrl(moment.gamePk, moment.playId, "home") });
-    player.play();
+    player
+      .replaceAsync({ uri: cdnUrl(moment.gamePk, moment.playId, BROADCASTS[0]) })
+      .catch(() => setHasError(true));
+  }
+
+  function openInBrowser() {
+    if (moment.savantUrl) {
+      Linking.openURL(moment.savantUrl).catch(() =>
+        Alert.alert("Could not open link")
+      );
+    }
   }
 
   const label = eventLabel(moment.event);
@@ -74,7 +89,7 @@ export default function VideoMomentCard({ moment, onLongPress }) {
           <VideoView
             player={player}
             style={styles.video}
-            allowsFullscreen
+            fullscreenOptions={{ supportedOrientations: "landscape" }}
             allowsPictureInPicture
             contentFit="contain"
           />
@@ -117,6 +132,12 @@ export default function VideoMomentCard({ moment, onLongPress }) {
           <Text style={styles.desc} numberOfLines={2}>
             {moment.description}
           </Text>
+        ) : null}
+        {moment.savantUrl ? (
+          <TouchableOpacity onPress={openInBrowser} style={styles.savantLink}>
+            <Ionicons name="open-outline" size={12} color={colors.textMuted} style={{ marginRight: 4 }} />
+            <Text style={styles.savantLinkText}>View on Savant</Text>
+          </TouchableOpacity>
         ) : null}
       </View>
     </View>
@@ -177,5 +198,14 @@ const styles = StyleSheet.create({
     fontSize: 11,
     lineHeight: 15,
     marginTop: 2,
+  },
+  savantLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  savantLinkText: {
+    color: colors.textMuted,
+    fontSize: 11,
   },
 });

@@ -123,6 +123,23 @@ _HIGHLIGHTS_CACHE_TTL = 600  # 10 minutes
 # Game feed cache: keyed by game_pk -> (play_map, matchup_map, duration_map)
 _game_feed_cache = {}
 
+# MLB content API cache: keyed by game_pk -> list of highlight items
+_content_cache = {}
+
+# Statcast event type -> MLB content API taxonomy keyword
+_STATCAST_TO_TAXONOMY = {
+    "home_run": "home-run",
+    "strikeout": "strikeout",
+    "single": "single",
+    "double": "double",
+    "triple": "triple",
+    "walk": "walk",
+    "sac_fly": "sacrifice-fly",
+    "field_error": "error",
+    "hit_by_pitch": "hit-by-pitch",
+    "grounded_into_double_play": "double-play",
+}
+
 
 # --- Helpers ---
 
@@ -207,6 +224,56 @@ def fetch_game_play_ids(game_pk, session):
                     except (ValueError, TypeError):
                         pass
     return play_id_map, matchup_map, duration_map
+
+
+def _fetch_game_content(game_pk, session):
+    """Fetch and cache MLB highlight items for a game from the Stats API."""
+    if game_pk in _content_cache:
+        return _content_cache[game_pk]
+    try:
+        url = f"https://statsapi.mlb.com/api/v1/game/{game_pk}/content"
+        resp = session.get(url, timeout=15)
+        resp.raise_for_status()
+        items = resp.json().get("highlights", {}).get("highlights", {}).get("items", [])
+        # Keep only individual-play highlights (not condensed games / recaps)
+        items = [i for i in items if i.get("type") == "video" and
+                 not any(kw.get("value") in ("condensed-game", "recap")
+                         for kw in i.get("keywordsAll", []))]
+        _content_cache[game_pk] = items
+        return items
+    except Exception:
+        _content_cache[game_pk] = []
+        return []
+
+
+def _find_video_url(game_pk, player_name, event):
+    """Return the best public mp4 URL for a play from the cached MLB content."""
+    items = _content_cache.get(game_pk, [])
+    if not items:
+        return None
+
+    taxonomy_target = _STATCAST_TO_TAXONOMY.get(event, "").lower()
+    player_lower = player_name.lower().strip()
+
+    for item in items:
+        keywords = item.get("keywordsAll", [])
+        kw_values = {kw.get("type"): kw.get("displayName", "").lower() for kw in keywords}
+        kw_taxonomies = {kw.get("value", "").lower() for kw in keywords if kw.get("type") == "taxonomy"}
+
+        player_match = player_lower and any(
+            player_lower in kw.get("displayName", "").lower()
+            for kw in keywords if kw.get("type") == "player"
+        )
+        if not player_match:
+            continue
+        if taxonomy_target and taxonomy_target not in kw_taxonomies:
+            continue
+
+        for pb in item.get("playbacks", []):
+            if pb.get("name") == "mp4Avc" and pb.get("url"):
+                return pb["url"]
+
+    return None
 
 
 def sanitize_filename(name):
@@ -614,13 +681,16 @@ def _resolve_pa_rows_to_videos(pa_rows, session):
 
     def fetch_one(game_pk):
         if game_pk in _game_feed_cache:
-            return game_pk, _game_feed_cache[game_pk]
-        try:
-            result = fetch_game_play_ids(game_pk, session)
-            _game_feed_cache[game_pk] = result
-            return game_pk, result
-        except Exception:
-            return game_pk, ({}, {}, {})
+            feed = _game_feed_cache[game_pk]
+        else:
+            try:
+                feed = fetch_game_play_ids(game_pk, session)
+                _game_feed_cache[game_pk] = feed
+            except Exception:
+                feed = ({}, {}, {})
+        # Fetch content in parallel (caches automatically)
+        _fetch_game_content(game_pk, session)
+        return game_pk, feed
 
     with ThreadPoolExecutor(max_workers=10) as executor:
         for game_pk, (play_map, matchup_map, duration_map) in executor.map(fetch_one, games.keys()):
@@ -683,6 +753,7 @@ def _resolve_pa_rows_to_videos(pa_rows, session):
             "play_id": play_id,
             "filename": build_filename(row),
             "savant_url": SPORTY_VIDEO_URL.format(play_id=play_id),
+            "video_url": _find_video_url(game_pk, row.get("player_name", ""), row.get("events", "")),
         })
 
     return videos
@@ -854,6 +925,54 @@ def api_player_plays():
     videos = _resolve_pa_rows_to_videos(pa_rows, session)
 
     return jsonify({"game_date": date_param, "videos": videos})
+
+
+@app.route("/api/stream/<play_id>")
+def stream_video(play_id):
+    """Proxy a play video to the iOS app with the headers MLB's CDN requires.
+
+    Query params:
+        game_pk (str): MLB game ID.
+    """
+    game_pk = request.args.get("game_pk", "").strip()
+    if not game_pk or not play_id:
+        return jsonify({"error": "game_pk and play_id are required"}), 400
+
+    session = create_session()
+    video_headers = {
+        "Origin": "https://www.mlb.com",
+        "Referer": "https://www.mlb.com/",
+        "Accept": "video/mp4,video/*;q=0.9,*/*;q=0.8",
+        "Sec-Fetch-Dest": "video",
+        "Sec-Fetch-Mode": "no-cors",
+        "Sec-Fetch-Site": "cross-site",
+    }
+    # Forward Range header so the player can seek
+    if "Range" in request.headers:
+        video_headers["Range"] = request.headers["Range"]
+
+    for broadcast in ["home", "away"]:
+        url = VIDEO_CDN_URL.format(game_pk=game_pk, broadcast=broadcast, play_id=play_id)
+        try:
+            resp = session.get(url, stream=True, timeout=(5, 60), headers=video_headers)
+            if resp.status_code in (200, 206):
+                out_headers = {
+                    "Content-Type": "video/mp4",
+                    "Accept-Ranges": "bytes",
+                    "Access-Control-Allow-Origin": "*",
+                }
+                for h in ("Content-Length", "Content-Range"):
+                    if h in resp.headers:
+                        out_headers[h] = resp.headers[h]
+                return Response(
+                    resp.iter_content(chunk_size=65536),
+                    status=resp.status_code,
+                    headers=out_headers,
+                )
+        except Exception:
+            continue
+
+    return jsonify({"error": "Video not available"}), 404
 
 
 @app.route("/api/download", methods=["POST"])
