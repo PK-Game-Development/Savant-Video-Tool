@@ -15,8 +15,7 @@
  */
 
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { initializeAuth, getAuth, getReactNativePersistence } from "firebase/auth";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { initializeAuth, getAuth, inMemoryPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Replace with your Firebase project's config object
@@ -31,14 +30,15 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// initializeAuth is required for React Native (getAuth uses web persistence which is unsupported)
+// Using inMemoryPersistence to isolate AsyncStorage/getReactNativePersistence issues
+// TODO: restore getReactNativePersistence(AsyncStorage) once auth initializes correctly
 let auth;
 try {
   auth = initializeAuth(app, {
-    persistence: getReactNativePersistence(AsyncStorage),
+    persistence: inMemoryPersistence,
   });
-} catch {
-  // Already initialized on hot reload
+} catch (e) {
+  console.error("[firebase] initializeAuth error:", e);
   auth = getAuth(app);
 }
 
