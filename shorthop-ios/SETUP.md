@@ -5,26 +5,102 @@ There are 6 parts. Don't skip any of them — each one builds on the last.
 
 **Total time:** About 30–45 minutes the first time.
 
+> **⚠️ Node version requirement:** This app requires **Node 20 LTS**. Node 22 or 24 will
+> cause Expo to crash. If you already have Node installed, check your version first
+> (`node --version`) and follow the nvm setup in Step 1 to make sure you're on 20.
+
 ---
 
 ## Part 1 — Install the tools you need on your computer
 
-### Step 1: Install Node.js
+### Step 1: Install Node.js version 20 (the right version)
 
-Node.js is the engine that runs JavaScript on your computer. The app needs it.
+The app requires a specific version of Node.js — **version 20**. Newer versions (22, 24)
+break Expo. The easiest way to manage this is with a tool called nvm, which lets you
+switch between Node versions.
 
-1. Open your web browser and go to: **https://nodejs.org**
-2. You'll see two big green buttons. Click the one that says **"LTS"** (it'll have a version number like "20.x.x LTS"). LTS means stable.
-3. The download starts automatically. When it finishes, open the file (it'll be in your Downloads folder).
-4. A window pops up. Click **Continue**, then **Continue**, then **Agree**, then **Install**.
-5. It'll ask for your Mac password. Type it and click **Install Software**.
-6. Click **Close** when it says the installation was successful.
+**1a. Check if you already have nvm installed:**
 
-**Check that it worked:** Open the Terminal app (press `Cmd + Space`, type "Terminal", hit Enter). Type this and press Enter:
+Open Terminal (press `Cmd + Space`, type "Terminal", press Enter). Type:
+```
+nvm --version
+```
+- If you see a version number → nvm is already installed. Skip to step 1d.
+- If you see `command not found` → continue to step 1b.
+
+**1b. Install nvm via Homebrew:**
+
+First check if Homebrew is installed:
+```
+brew --version
+```
+If you see `command not found`, install Homebrew first:
+```
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+Then install nvm:
+```
+brew install nvm
+```
+
+**1c. Add nvm to your shell so Terminal can find it:**
+
+First, find out which Mac you have. Type:
+```
+uname -m
+```
+- `arm64` = Apple Silicon (M1/M2/M3/M4)
+- `x86_64` = Intel
+
+Now open your shell config file:
+```
+nano ~/.zshrc
+```
+Press the **down arrow** to get to the very bottom of the file. Add these lines
+(choose the right set for your Mac):
+
+**Apple Silicon (arm64):**
+```
+export NVM_DIR="$HOME/.nvm"
+[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"
+[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"
+```
+
+**Intel (x86_64):**
+```
+export NVM_DIR="$HOME/.nvm"
+[ -s "/usr/local/opt/nvm/nvm.sh" ] && \. "/usr/local/opt/nvm/nvm.sh"
+[ -s "/usr/local/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/usr/local/opt/nvm/etc/bash_completion.d/nvm"
+```
+
+Save and close: press **Ctrl+X**, then **Y**, then **Enter**.
+
+Reload the shell:
+```
+source ~/.zshrc
+```
+
+Verify nvm works:
+```
+nvm --version
+```
+You should see a version number like `0.39.7`. ✓
+
+**1d. Install Node 20 and set it as your default:**
+```
+nvm install 20
+nvm use 20
+nvm alias default 20
+```
+
+**Check that it worked:**
 ```
 node --version
 ```
-You should see something like `v20.11.0`. If you do, Node is installed. ✓
+You should see `v20.x.x`. If it starts with 20, you're good. ✓
+
+> If you already had a different Node version installed and nothing above worked,
+> close the Terminal window completely, open a fresh one, and run `node --version` again.
 
 ---
 
