@@ -28,7 +28,8 @@
     "firebase": "^10.12.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "babel-preset-expo": "~11.0.0"
   },
   "private": true
 }
