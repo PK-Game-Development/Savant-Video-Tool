@@ -38,6 +38,7 @@ export default function AddMomentScreen({ route, navigation }) {
   const [query, setQuery] = useState("");
   const [mode, setMode] = useState("highlights"); // "highlights" | "player" | "team"
   const [plays, setPlays] = useState([]);
+  const [displayCount, setDisplayCount] = useState(20);
   const [playerResults, setPlayerResults] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -56,8 +57,9 @@ export default function AddMomentScreen({ route, navigation }) {
   async function loadHighlights(team = null) {
     setLoading(true);
     setPlays([]);
+    setDisplayCount(20);
     try {
-      const data = await getHighlights({ date, team, limit: 15 });
+      const data = await getHighlights({ date, team, limit: 50 });
       setPlays(data.videos || []);
     } catch (err) {
       Alert.alert("Could not load plays", err.message);
@@ -120,6 +122,7 @@ export default function AddMomentScreen({ route, navigation }) {
     setSelectedTeam(null);
     setMode("highlights");
     setPlayerResults([]);
+    setDisplayCount(20);
     loadHighlights(null);
   }
 
@@ -235,7 +238,8 @@ export default function AddMomentScreen({ route, navigation }) {
         <ActivityIndicator color={colors.textSecondary} style={styles.loader} />
       ) : (
         <FlatList
-          data={plays}
+          style={styles.list}
+          data={plays.slice(0, displayCount)}
           keyExtractor={(v) => v.play_id}
           renderItem={({ item }) => (
             <PlayCard
@@ -247,6 +251,13 @@ export default function AddMomentScreen({ route, navigation }) {
           ListEmptyComponent={
             <Text style={styles.empty}>No plays found for this date.</Text>
           }
+          ListFooterComponent={
+            displayCount < plays.length ? (
+              <ActivityIndicator color={colors.textMuted} style={{ marginVertical: 16 }} />
+            ) : null
+          }
+          onEndReached={() => setDisplayCount((c) => c + 15)}
+          onEndReachedThreshold={0.4}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
@@ -392,6 +403,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 10,
     marginTop: 4,
+  },
+  list: {
+    flex: 1,
   },
   loader: {
     marginTop: 60,

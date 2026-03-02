@@ -46,6 +46,20 @@ export default function AppNavigator() {
     return unsubscribe;
   }, []);
 
+  // DEV: bypass auth when EXPO_PUBLIC_SKIP_AUTH=true in .env
+  if (process.env.EXPO_PUBLIC_SKIP_AUTH === "true") {
+    return (
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={screenOptions}>
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Day" component={DayScreen} />
+          <Stack.Screen name="AddMoment" component={AddMomentScreen} />
+          <Stack.Screen name="Settings" component={SettingsScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    );
+  }
+
   // Splash/loading while auth state is being determined
   if (user === undefined) return null;
 
@@ -53,14 +67,11 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={screenOptions}>
         {!user ? (
-          // Not signed in
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
         ) : !hasTeam ? (
-          // Signed in but no team picked yet
           <Stack.Screen
             name="Onboarding"
             component={OnboardingScreen}
-            // After saving team, refresh by detecting profile change
             listeners={{
               focus: async () => {
                 const profile = await getUserProfile().catch(() => null);
@@ -69,7 +80,6 @@ export default function AppNavigator() {
             }}
           />
         ) : (
-          // Fully onboarded — main app
           <>
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="Day" component={DayScreen} />

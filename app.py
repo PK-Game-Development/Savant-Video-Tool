@@ -21,6 +21,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import uuid
 import zipfile
 from collections import defaultdict
@@ -115,9 +116,12 @@ jobs = {}
 _player_cache = {}
 _PLAYER_CACHE_TTL = 300  # 5 minutes
 
-# Highlights cache: (timestamp, data)
-_highlights_cache = (0, None)
+# Highlights cache: keyed by (date, team) -> (timestamp, data)
+_highlights_cache = {}
 _HIGHLIGHTS_CACHE_TTL = 600  # 10 minutes
+
+# Game feed cache: keyed by game_pk -> (play_map, matchup_map, duration_map)
+_game_feed_cache = {}
 
 
 # --- Helpers ---
@@ -607,17 +611,22 @@ def _resolve_pa_rows_to_videos(pa_rows, session):
     game_play_maps = {}
     game_matchup_maps = {}
     game_duration_maps = {}
-    for game_pk in games:
+
+    def fetch_one(game_pk):
+        if game_pk in _game_feed_cache:
+            return game_pk, _game_feed_cache[game_pk]
         try:
-            play_map, matchup_map, duration_map = fetch_game_play_ids(game_pk, session)
+            result = fetch_game_play_ids(game_pk, session)
+            _game_feed_cache[game_pk] = result
+            return game_pk, result
+        except Exception:
+            return game_pk, ({}, {}, {})
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        for game_pk, (play_map, matchup_map, duration_map) in executor.map(fetch_one, games.keys()):
             game_play_maps[game_pk] = play_map
             game_matchup_maps[game_pk] = matchup_map
             game_duration_maps[game_pk] = duration_map
-        except Exception:
-            game_play_maps[game_pk] = {}
-            game_matchup_maps[game_pk] = {}
-            game_duration_maps[game_pk] = {}
-        time.sleep(0.2)
 
     videos = []
     for row in pa_rows:
@@ -710,8 +719,6 @@ def api_highlights():
         team  (str): 3-letter team code (e.g. NYY). Filters to plays involving that team.
         limit (int): Max plays to return. Defaults to 15.
     """
-    global _highlights_cache
-
     date_param = request.args.get("date", "").strip()
     team_param = request.args.get("team", "").strip().upper()
     try:
@@ -719,11 +726,11 @@ def api_highlights():
     except ValueError:
         limit = 15
 
-    # Only cache the default no-param request
-    use_cache = not date_param and not team_param
-    if use_cache:
-        cache_ts, cache_data = _highlights_cache
-        if cache_data is not None and (time.time() - cache_ts) < _HIGHLIGHTS_CACHE_TTL:
+    cache_key = (date_param, team_param)
+    cached = _highlights_cache.get(cache_key)
+    if cached:
+        cache_ts, cache_data = cached
+        if time.time() - cache_ts < _HIGHLIGHTS_CACHE_TTL:
             return jsonify(cache_data)
 
     session = create_session()
@@ -785,8 +792,7 @@ def api_highlights():
         "game_date": game_date,
         "videos": videos,
     }
-    if use_cache:
-        _highlights_cache = (time.time(), result)
+    _highlights_cache[cache_key] = (time.time(), result)
     return jsonify(result)
 
 

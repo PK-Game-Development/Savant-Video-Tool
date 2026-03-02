@@ -4,8 +4,12 @@
  * Data model:
  *   users/{uid}                        — user profile (favoriteTeam, displayName)
  *   users/{uid}/moments/{autoId}       — one saved baseball moment
+ *
+ * DEV fallback: when no Firebase user is signed in, AsyncStorage is used
+ * so the full save/read/delete flow works without auth.
  */
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   doc,
   getDoc,
@@ -20,6 +24,19 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "./firebase";
+
+// ─── Local (AsyncStorage) helpers ─────────────────────────────────────────────
+
+const LOCAL_KEY = "shorthop_moments";
+
+async function localGetAll() {
+  const raw = await AsyncStorage.getItem(LOCAL_KEY);
+  return raw ? JSON.parse(raw) : [];
+}
+
+async function localSaveAll(moments) {
+  await AsyncStorage.setItem(LOCAL_KEY, JSON.stringify(moments));
+}
 
 // ─── User Profile ─────────────────────────────────────────────────────────────
 
@@ -38,15 +55,8 @@ export async function setUserProfile(data) {
 
 // ─── Moments ─────────────────────────────────────────────────────────────────
 
-/**
- * Save a moment to Firestore.
- * @param {Object} video  - play object from Flask API (play_id, game_pk, player, event, etc.)
- * @param {Object} opts   - { isAutoSaved: bool, autoSaveType: 'mlb'|'team'|null }
- * @returns {string} Firestore document ID
- */
 export async function saveMoment(video, { isAutoSaved = false, autoSaveType = null } = {}) {
   const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error("Not authenticated");
 
   const momentData = {
     date: video.date,
@@ -61,20 +71,32 @@ export async function saveMoment(video, { isAutoSaved = false, autoSaveType = nu
     savantUrl: video.savant_url || "",
     isAutoSaved,
     autoSaveType,
-    createdAt: serverTimestamp(),
+    createdAt: Date.now(),
   };
 
-  const ref = await addDoc(collection(db, "users", uid, "moments"), momentData);
+  if (!uid) {
+    // DEV: persist locally
+    const all = await localGetAll();
+    const id = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    all.push({ id, ...momentData });
+    await localSaveAll(all);
+    return id;
+  }
+
+  const ref = await addDoc(collection(db, "users", uid, "moments"), {
+    ...momentData,
+    createdAt: serverTimestamp(),
+  });
   return ref.id;
 }
 
-/**
- * Get all moments for a specific date.
- * @param {string} date  YYYY-MM-DD
- */
 export async function getMomentsForDate(date) {
   const uid = auth.currentUser?.uid;
-  if (!uid) return [];
+
+  if (!uid) {
+    const all = await localGetAll();
+    return all.filter((m) => m.date === date);
+  }
 
   const q = query(
     collection(db, "users", uid, "moments"),
@@ -85,14 +107,13 @@ export async function getMomentsForDate(date) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-/**
- * Get all moments between two dates (inclusive), for calendar dot markers.
- * @param {string} startDate  YYYY-MM-DD
- * @param {string} endDate    YYYY-MM-DD
- */
 export async function getMomentsInRange(startDate, endDate) {
   const uid = auth.currentUser?.uid;
-  if (!uid) return [];
+
+  if (!uid) {
+    const all = await localGetAll();
+    return all.filter((m) => m.date >= startDate && m.date <= endDate);
+  }
 
   const q = query(
     collection(db, "users", uid, "moments"),
@@ -104,21 +125,26 @@ export async function getMomentsInRange(startDate, endDate) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-/**
- * Delete a moment by Firestore document ID.
- */
 export async function deleteMoment(momentId) {
   const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error("Not authenticated");
+
+  if (!uid) {
+    const all = await localGetAll();
+    await localSaveAll(all.filter((m) => m.id !== momentId));
+    return;
+  }
+
   await deleteDoc(doc(db, "users", uid, "moments", momentId));
 }
 
-/**
- * Check if a play (by playId) is already saved for the current user.
- */
 export async function isPlaySaved(playId) {
   const uid = auth.currentUser?.uid;
-  if (!uid) return false;
+
+  if (!uid) {
+    const all = await localGetAll();
+    return all.some((m) => m.playId === playId);
+  }
+
   const q = query(
     collection(db, "users", uid, "moments"),
     where("playId", "==", playId)
@@ -127,9 +153,6 @@ export async function isPlaySaved(playId) {
   return !snap.empty;
 }
 
-/**
- * Get the set of already-saved playIds for a given date (for checkmark display).
- */
 export async function getSavedPlayIds(date) {
   const moments = await getMomentsForDate(date);
   return new Set(moments.map((m) => m.playId));

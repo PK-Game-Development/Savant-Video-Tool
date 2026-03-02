@@ -32,7 +32,9 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      "expo-web-browser",
+      "expo-video"
     ],
     "extra": {
       "apiBaseUrl": "https://YOUR-DEPLOYED-FLASK-URL.com",

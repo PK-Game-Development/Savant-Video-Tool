@@ -21,13 +21,11 @@ import {
 } from "firebase/auth";
 import { auth } from "./firebase";
 
-// Replace with your Google OAuth client IDs from Google Cloud Console
+// Google OAuth client IDs — set in .env (never hardcode here)
 // Web Client ID: Firebase Console → Authentication → Google → Web SDK configuration
-// iOS Client ID: Google Cloud Console → Credentials → your iOS OAuth client
-const GOOGLE_WEB_CLIENT_ID =
-  "YOUR_GOOGLE_WEB_CLIENT_ID.apps.googleusercontent.com";
-const GOOGLE_IOS_CLIENT_ID =
-  "YOUR_GOOGLE_IOS_CLIENT_ID.apps.googleusercontent.com";
+// iOS Client ID: Google Cloud Console → Credentials → iOS OAuth client (bundle: com.shorthop.app)
+const resolvedWebClientId = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined;
+const resolvedIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined;
 
 // ─── Apple ───────────────────────────────────────────────────────────────────
 
@@ -59,8 +57,8 @@ export async function signInWithApple() {
  */
 export function useGoogleAuth() {
   const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: GOOGLE_WEB_CLIENT_ID,
-    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    webClientId: resolvedWebClientId,
+    iosClientId: resolvedIosClientId,
     selectAccount: true,
   });
 

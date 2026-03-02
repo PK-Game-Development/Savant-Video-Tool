@@ -16,7 +16,8 @@ import {
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { getMomentsForDate, deleteMoment } from "../services/moments";
-import MomentCard from "../components/MomentCard";
+import { consumeMoments, invalidateMoments } from "../services/prefetch";
+import VideoMomentCard from "../components/VideoMomentCard";
 import colors from "../constants/colors";
 import { eventLabel } from "../constants/teams";
 
@@ -40,7 +41,7 @@ export default function DayScreen({ route, navigation }) {
   async function load() {
     setLoading(true);
     try {
-      const data = await getMomentsForDate(date);
+      const data = await consumeMoments(date, () => getMomentsForDate(date));
       setMoments(data);
     } catch {
       setMoments([]);
@@ -61,6 +62,7 @@ export default function DayScreen({ route, navigation }) {
           onPress: async () => {
             try {
               await deleteMoment(moment.id);
+              invalidateMoments(date);
               setMoments((prev) => prev.filter((m) => m.id !== moment.id));
             } catch (err) {
               Alert.alert("Error", err.message);
@@ -106,9 +108,8 @@ export default function DayScreen({ route, navigation }) {
         data={moments}
         keyExtractor={(m) => m.id}
         renderItem={({ item }) => (
-          <MomentCard
+          <VideoMomentCard
             moment={item}
-            onPress={() => openSavantUrl(item)}
             onLongPress={() => handleLongPress(item)}
           />
         )}

@@ -31,6 +31,7 @@ import {
   getUserProfile,
 } from "../services/moments";
 import { getTopPlay } from "../services/savantApi";
+import { prefetchMoments } from "../services/prefetch";
 import MomentCard from "../components/MomentCard";
 import colors from "../constants/colors";
 import { teamName } from "../constants/teams";
@@ -142,6 +143,7 @@ export default function HomeScreen({ navigation }) {
   }
 
   function onDayPress(day) {
+    prefetchMoments(day.dateString, () => getMomentsForDate(day.dateString));
     navigation.navigate("Day", { date: day.dateString });
   }
 
