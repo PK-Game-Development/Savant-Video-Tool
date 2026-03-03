@@ -15,7 +15,7 @@ import {
   UIManager,
 } from "react-native";
 import { Swipeable } from "react-native-gesture-handler";
-import Svg, { Rect, Line, Path, Circle } from "react-native-svg";
+import Svg, { Rect, Line, Path } from "react-native-svg";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { getMomentsForDate, deleteMoment } from "../services/moments";
@@ -34,52 +34,18 @@ function formatHeaderDate(dateStr) {
 
 // ─── Bat-hits-trashcan SVG icon ───────────────────────────────────────────────
 
-function BatTrashIcon() {
+function TrashIcon() {
   return (
-    <Svg width={52} height={52} viewBox="0 0 60 60">
-      {/* ── Trash can ── */}
-      {/* Knob on lid */}
-      <Rect x="42" y="10" width="6" height="5" rx="2" fill="white" />
-      {/* Lid (slightly wider than body) */}
-      <Rect x="36" y="15" width="18" height="5" rx="2" fill="white" />
+    <Svg width={28} height={28} viewBox="0 0 24 24">
+      {/* Handle on lid */}
+      <Rect x="9" y="1" width="6" height="3" rx="1.5" fill="white" />
+      {/* Lid */}
+      <Rect x="3" y="4" width="18" height="3" rx="1.5" fill="white" />
       {/* Body */}
-      <Rect x="38" y="20" width="14" height="24" rx="2" fill="white" />
-      {/* Trash lines inside body (in the red button color so they read as cutouts) */}
-      <Line x1="40.5" y1="26" x2="49.5" y2="26" stroke="#D32F2F" strokeWidth="2" strokeLinecap="round" />
-      <Line x1="40.5" y1="31" x2="49.5" y2="31" stroke="#D32F2F" strokeWidth="2" strokeLinecap="round" />
-      <Line x1="40.5" y1="36" x2="49.5" y2="36" stroke="#D32F2F" strokeWidth="2" strokeLinecap="round" />
-
-      {/* ── Baseball bat ── */}
-      {/* Handle — thin */}
-      <Path
-        d="M 4,55 C 8,51 20,38 27,27"
-        stroke="white"
-        strokeWidth="3.5"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* Barrel — wider, hitting the lid */}
-      <Path
-        d="M 27,27 C 30,22 33,18 37,14"
-        stroke="white"
-        strokeWidth="8"
-        strokeLinecap="round"
-        fill="none"
-      />
-      {/* Barrel tip cap */}
-      <Circle cx="37" cy="14" r="4" fill="white" />
-
-      {/* ── Impact lines (comic-style "WHAM" lines) ── */}
-      {/* Up */}
-      <Line x1="33" y1="12" x2="30" y2="4"  stroke="white" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Up-left */}
-      <Line x1="28" y1="15" x2="21" y2="9"  stroke="white" strokeWidth="2"   strokeLinecap="round" />
-      {/* Left */}
-      <Line x1="26" y1="22" x2="17" y2="20" stroke="white" strokeWidth="2"   strokeLinecap="round" />
-      {/* Down-left */}
-      <Line x1="27" y1="30" x2="18" y2="35" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-      {/* Up-right */}
-      <Line x1="38" y1="10" x2="44" y2="4"  stroke="white" strokeWidth="2"   strokeLinecap="round" />
+      <Path d="M5,8 L6.5,22 Q6.7,23 8,23 L16,23 Q17.3,23 17.5,22 L19,8 Z" fill="white" />
+      {/* Lines inside */}
+      <Line x1="10" y1="11" x2="10" y2="20" stroke="#D32F2F" strokeWidth="1.5" strokeLinecap="round" />
+      <Line x1="14" y1="11" x2="14" y2="20" stroke="#D32F2F" strokeWidth="1.5" strokeLinecap="round" />
     </Svg>
   );
 }
@@ -99,7 +65,7 @@ function SwipeableMomentCard({ moment, onDelete }) {
         }}
         activeOpacity={0.85}
       >
-        <BatTrashIcon />
+        <TrashIcon />
       </TouchableOpacity>
     );
   }
