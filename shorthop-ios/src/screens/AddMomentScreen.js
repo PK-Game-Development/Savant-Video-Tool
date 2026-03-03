@@ -23,7 +23,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { getHighlights, searchPlayers, getPlayerPlays } from "../services/savantApi";
 import { saveMoment, getSavedPlayIds } from "../services/moments";
-import { invalidateMoments } from "../services/prefetch";
+import { invalidateMoments, consumeHighlights } from "../services/prefetch";
 import PlayCard from "../components/PlayCard";
 import colors from "../constants/colors";
 import { TEAMS } from "../constants/teams";
@@ -60,8 +60,10 @@ export default function AddMomentScreen({ route, navigation }) {
     setPlays([]);
     setDisplayCount(20);
     try {
-      const data = await getHighlights({ date, team, limit: 50 });
-      setPlays(data.videos || []);
+      const data = await consumeHighlights(date, team, () =>
+        getHighlights({ date, team, limit: 50 })
+      );
+      setPlays(data?.videos || []);
     } catch (err) {
       Alert.alert("Could not load plays", err.message);
     } finally {
