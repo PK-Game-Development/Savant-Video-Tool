@@ -9,17 +9,19 @@
  * On mount / foreground: triggers auto-save check for today.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
   ScrollView,
+  FlatList,
+  Modal,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
+import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { onAuthStateChanged } from "firebase/auth";
@@ -36,6 +38,224 @@ import MomentCard from "../components/MomentCard";
 import colors from "../constants/colors";
 import { teamName } from "../constants/teams";
 
+// ─── Picker data ───────────────────────────────────────────────────────────────
+
+const ITEM_H = 48;
+const PICKER_H = ITEM_H * 5;
+const MONTH_NAMES = [
+  "January", "February", "March", "April",
+  "May", "June", "July", "August",
+  "September", "October", "November", "December",
+];
+const YEAR_LIST = (() => {
+  const y = new Date().getFullYear();
+  return Array.from({ length: y - 2015 }, (_, i) => 2016 + i);
+})();
+
+// ─── Drum-roll picker ──────────────────────────────────────────────────────────
+
+function MonthYearPicker({ visible, initialMonth, initialYear, onConfirm, onCancel }) {
+  const [selMonth, setSelMonth] = useState(initialMonth);
+  const [selYear, setSelYear] = useState(initialYear);
+  const monthRef = useRef(null);
+  const yearRef = useRef(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    setSelMonth(initialMonth);
+    setSelYear(initialYear);
+    const t = setTimeout(() => {
+      monthRef.current?.scrollToIndex({ index: initialMonth - 1, animated: false });
+      const yi = YEAR_LIST.indexOf(initialYear);
+      yearRef.current?.scrollToIndex({ index: yi >= 0 ? yi : 0, animated: false });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [visible, initialMonth, initialYear]);
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
+      <TouchableOpacity style={ps.backdrop} onPress={onCancel} activeOpacity={1} />
+      <View style={ps.sheet}>
+        {/* Toolbar */}
+        <View style={ps.toolbar}>
+          <TouchableOpacity
+            onPress={onCancel}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={ps.cancel}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => onConfirm(selMonth, selYear)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={ps.done}>Done</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Drum columns */}
+        <View style={ps.drumRow}>
+          {/* Center selection bar */}
+          <View pointerEvents="none" style={ps.selBar} />
+
+          {/* Month */}
+          <View style={ps.col}>
+            <FlatList
+              ref={monthRef}
+              data={MONTH_NAMES}
+              keyExtractor={(_, i) => `m${i}`}
+              snapToInterval={ITEM_H}
+              decelerationRate="fast"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={ps.colContent}
+              getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
+                setSelMonth(Math.max(1, Math.min(idx + 1, 12)));
+              }}
+              renderItem={({ item, index }) => (
+                <View style={ps.item}>
+                  <Text style={[ps.itemText, index === selMonth - 1 && ps.itemSel]}>
+                    {item}
+                  </Text>
+                </View>
+              )}
+            />
+            <LinearGradient
+              colors={[colors.surfaceElevated, "transparent"]}
+              style={ps.fadeTop}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={["transparent", colors.surfaceElevated]}
+              style={ps.fadeBot}
+              pointerEvents="none"
+            />
+          </View>
+
+          {/* Year */}
+          <View style={ps.col}>
+            <FlatList
+              ref={yearRef}
+              data={YEAR_LIST}
+              keyExtractor={(y) => `y${y}`}
+              snapToInterval={ITEM_H}
+              decelerationRate="fast"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={ps.colContent}
+              getItemLayout={(_, i) => ({ length: ITEM_H, offset: ITEM_H * i, index: i })}
+              onMomentumScrollEnd={(e) => {
+                const idx = Math.round(e.nativeEvent.contentOffset.y / ITEM_H);
+                const clamped = Math.max(0, Math.min(idx, YEAR_LIST.length - 1));
+                setSelYear(YEAR_LIST[clamped]);
+              }}
+              renderItem={({ item }) => (
+                <View style={ps.item}>
+                  <Text style={[ps.itemText, item === selYear && ps.itemSel]}>
+                    {item}
+                  </Text>
+                </View>
+              )}
+            />
+            <LinearGradient
+              colors={[colors.surfaceElevated, "transparent"]}
+              style={ps.fadeTop}
+              pointerEvents="none"
+            />
+            <LinearGradient
+              colors={["transparent", colors.surfaceElevated]}
+              style={ps.fadeBot}
+              pointerEvents="none"
+            />
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+const ps = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  sheet: {
+    backgroundColor: colors.surfaceElevated,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 44,
+  },
+  toolbar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
+  cancel: {
+    color: colors.textSecondary,
+    fontSize: 16,
+  },
+  done: {
+    color: colors.accent,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  drumRow: {
+    flexDirection: "row",
+    height: PICKER_H,
+    paddingHorizontal: 20,
+    overflow: "hidden",
+  },
+  selBar: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    top: ITEM_H * 2,
+    height: ITEM_H,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255,255,255,0.18)",
+  },
+  col: {
+    flex: 1,
+    overflow: "hidden",
+  },
+  colContent: {
+    paddingVertical: ITEM_H * 2,
+  },
+  item: {
+    height: ITEM_H,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  itemText: {
+    color: colors.textMuted,
+    fontSize: 17,
+  },
+  itemSel: {
+    color: colors.textPrimary,
+    fontWeight: "500",
+  },
+  fadeTop: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: ITEM_H * 2,
+  },
+  fadeBot: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: ITEM_H * 2,
+  },
+});
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
 function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
@@ -48,13 +268,20 @@ function monthRange(dateStr) {
   return { start, end };
 }
 
+// ─── Screen ────────────────────────────────────────────────────────────────────
+
 export default function HomeScreen({ navigation }) {
   const today = todayStr();
   const [currentMonth, setCurrentMonth] = useState(today.slice(0, 7) + "-01");
+  const [calendarKey, setCalendarKey] = useState(0);
+  const [pickerVisible, setPickerVisible] = useState(false);
   const [markedDates, setMarkedDates] = useState({});
   const [todayMoments, setTodayMoments] = useState([]);
   const [loadingAuto, setLoadingAuto] = useState(false);
   const [profile, setProfile] = useState(null);
+
+  const displayYear = parseInt(currentMonth.slice(0, 4));
+  const displayMonth = parseInt(currentMonth.slice(5, 7));
 
   // Load user profile once
   useEffect(() => {
@@ -82,19 +309,16 @@ export default function HomeScreen({ navigation }) {
             : m.autoSaveType === "team"
             ? colors.autoSaveTeam
             : colors.manualSave;
-        // Avoid duplicate dot colors for the same day
         if (!dots[m.date].dots.find((d) => d.color === dotColor)) {
           dots[m.date].dots.push({ color: dotColor, key: m.autoSaveType || "manual" });
         }
       }
-      // Highlight today
       if (!dots[today]) dots[today] = { dots: [] };
       dots[today].selected = true;
       dots[today].selectedColor = colors.accent;
-
       setMarkedDates(dots);
     } catch {
-      // Non-critical — calendar still works without dots
+      // Non-critical
     }
   }
 
@@ -102,7 +326,6 @@ export default function HomeScreen({ navigation }) {
     try {
       const moments = await getMomentsForDate(today);
       setTodayMoments(moments);
-      // Trigger auto-save only if none exist yet today
       const hasAutoSave = moments.some((m) => m.isAutoSaved);
       if (!hasAutoSave && profile?.favoriteTeam) {
         runAutoSave(profile.favoriteTeam);
@@ -117,26 +340,21 @@ export default function HomeScreen({ navigation }) {
   async function runAutoSave(favoriteTeam) {
     setLoadingAuto(true);
     try {
-      // MLB top play
       const mlbPlay = await getTopPlay({ limit: 1 });
       if (mlbPlay) {
         await saveMoment(mlbPlay, { isAutoSaved: true, autoSaveType: "mlb" });
       }
-
-      // Team top play (only if different from MLB top play)
       if (favoriteTeam) {
         const teamPlay = await getTopPlay({ team: favoriteTeam, limit: 1 });
         if (teamPlay && teamPlay.play_id !== mlbPlay?.play_id) {
           await saveMoment(teamPlay, { isAutoSaved: true, autoSaveType: "team" });
         }
       }
-
-      // Refresh after saving
       const fresh = await getMomentsForDate(today);
       setTodayMoments(fresh);
       loadCalendarDots(currentMonth);
     } catch {
-      // Auto-save is best-effort; don't alert the user
+      // Auto-save is best-effort
     } finally {
       setLoadingAuto(false);
     }
@@ -153,6 +371,18 @@ export default function HomeScreen({ navigation }) {
   function onMonthChange(month) {
     setCurrentMonth(month.dateString);
     loadCalendarDots(month.dateString);
+  }
+
+  function openPicker() {
+    setPickerVisible(true);
+  }
+
+  function confirmPicker(month, year) {
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-01`;
+    setCurrentMonth(dateStr);
+    loadCalendarDots(dateStr);
+    setCalendarKey((k) => k + 1);
+    setPickerVisible(false);
   }
 
   const autoSavedToday = todayMoments.filter((m) => m.isAutoSaved);
@@ -174,11 +404,31 @@ export default function HomeScreen({ navigation }) {
       </View>
 
       <Calendar
-        current={today}
+        key={calendarKey}
+        current={currentMonth}
+        minDate="2016-01-01"
         onDayPress={onDayPress}
         onMonthChange={onMonthChange}
         markingType="multi-dot"
         markedDates={markedDates}
+        renderHeader={() => (
+          <TouchableOpacity
+            onPress={openPicker}
+            style={styles.calendarHeaderBtn}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+          >
+            <Text style={styles.calendarHeaderText}>
+              {MONTH_NAMES[displayMonth - 1]} {displayYear}
+            </Text>
+            <Ionicons
+              name="chevron-down"
+              size={13}
+              color={colors.textSecondary}
+              style={{ marginLeft: 5, marginTop: 1 }}
+            />
+          </TouchableOpacity>
+        )}
         theme={{
           backgroundColor: colors.background,
           calendarBackground: colors.background,
@@ -238,6 +488,14 @@ export default function HomeScreen({ navigation }) {
           </View>
         ))}
       </View>
+
+      <MonthYearPicker
+        visible={pickerVisible}
+        initialMonth={displayMonth}
+        initialYear={displayYear}
+        onConfirm={confirmPicker}
+        onCancel={() => setPickerVisible(false)}
+      />
     </ScrollView>
   );
 }
@@ -266,6 +524,17 @@ const styles = StyleSheet.create({
   },
   calendar: {
     marginHorizontal: 8,
+  },
+  calendarHeaderBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  calendarHeaderText: {
+    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: "300",
+    letterSpacing: 0.5,
   },
   section: {
     paddingHorizontal: 20,
