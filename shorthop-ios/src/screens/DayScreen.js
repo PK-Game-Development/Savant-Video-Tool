@@ -117,7 +117,7 @@ export default function DayScreen({ route, navigation }) {
     if (newDate < "2017-01-01") return;
     // Don't go into the future
     if (newDate > new Date().toISOString().split("T")[0]) return;
-    navigation.replace("Day", { date: newDate });
+    navigation.replace("Day", { date: newDate, direction: delta > 0 ? "forward" : "backward" });
   }
 
   const daySwipe = Gesture.Pan()

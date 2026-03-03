@@ -26,6 +26,12 @@ const screenOptions = {
   animation: "slide_from_right",
 };
 
+function dayOptions({ route }) {
+  return {
+    animation: route.params?.direction === "backward" ? "slide_from_left" : "slide_from_right",
+  };
+}
+
 export default function AppNavigator() {
   const [user, setUser] = useState(undefined); // undefined = loading
   const [hasTeam, setHasTeam] = useState(false);
@@ -53,7 +59,7 @@ export default function AppNavigator() {
       <NavigationContainer>
         <Stack.Navigator screenOptions={screenOptions}>
           <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="Day" component={DayScreen} />
+          <Stack.Screen name="Day" component={DayScreen} options={dayOptions} />
           <Stack.Screen name="AddMoment" component={AddMomentScreen} />
           <Stack.Screen name="GamePlays" component={GamePlaysScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
@@ -84,7 +90,7 @@ export default function AppNavigator() {
         ) : (
           <>
             <Stack.Screen name="Home" component={HomeScreen} />
-            <Stack.Screen name="Day" component={DayScreen} />
+            <Stack.Screen name="Day" component={DayScreen} options={dayOptions} />
             <Stack.Screen name="AddMoment" component={AddMomentScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
           </>
