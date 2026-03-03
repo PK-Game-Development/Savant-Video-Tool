@@ -1,73 +1,91 @@
 /**
- * VideoMomentCard — moment card with an embedded tap-to-play video.
+ * VideoMomentCard — moment card with video thumbnail and tap-to-play.
  *
- * Video source: fastball-clips.mlb.com CDN (direct MP4, no proxy needed).
- * Tries the home broadcast first; falls back to away on error.
- * Long-press triggers delete. Tap "View on Savant" to open in browser.
+ * Video is streamed through the Flask proxy (/api/stream) so the MLB CDN
+ * headers are handled server-side rather than relying on iOS AVPlayer to
+ * forward them.  The first frame is pulled via expo-video-thumbnails and
+ * shown as a poster until the user taps play.
  */
 
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Linking,
+  Alert,
+  Image,
+  ActivityIndicator,
+} from "react-native";
 import { VideoView, useVideoPlayer } from "expo-video";
+import * as VideoThumbnails from "expo-video-thumbnails";
 import { Ionicons } from "@expo/vector-icons";
 import colors from "../constants/colors";
 import { eventLabel } from "../constants/teams";
+import { API_BASE } from "../services/savantApi";
 
-const BROADCASTS = ["home", "away"];
-
-// MLB's CDN requires these headers or it redirects to a search page instead of the video.
-const CDN_HEADERS = {
-  Origin: "https://www.mlb.com",
-  Referer: "https://www.mlb.com/",
-};
-
-function cdnSource(gamePk, playId, broadcast) {
-  return {
-    uri: `https://fastball-clips.mlb.com/${gamePk}/${broadcast}/${playId}.mp4`,
-    headers: CDN_HEADERS,
-  };
+function proxyUrl(gamePk, playId) {
+  return `${API_BASE}/api/stream/${playId}?game_pk=${gamePk}`;
 }
 
 export default function VideoMomentCard({ moment, onLongPress }) {
   const [active, setActive] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const broadcastIdx = useRef(0);
+  const [thumbnail, setThumbnail] = useState(null);
+  const [thumbLoading, setThumbLoading] = useState(true);
+  const didActivate = useRef(false);
 
   const player = useVideoPlayer(null, (p) => {
     p.loop = false;
+    p.muted = false;
   });
 
-  // Attach listener at mount so no status events are ever missed.
+  // Generate thumbnail from proxy stream on mount
+  useEffect(() => {
+    if (!moment.gamePk || !moment.playId) {
+      setThumbLoading(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { uri } = await VideoThumbnails.getThumbnailAsync(
+          proxyUrl(moment.gamePk, moment.playId),
+          { time: 0 }
+        );
+        if (!cancelled) setThumbnail(uri);
+      } catch {
+        // no thumbnail — plain dark background is fine
+      } finally {
+        if (!cancelled) setThumbLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [moment.gamePk, moment.playId]);
+
+  // Status listener for play/error handling
   useEffect(() => {
     const sub = player.addListener("statusChange", ({ status, error }) => {
       if (status === "error" || error) {
-        // Try the next broadcast (home → away) before giving up.
-        const next = broadcastIdx.current + 1;
-        if (next < BROADCASTS.length) {
-          broadcastIdx.current = next;
-          player
-            .replaceAsync(cdnSource(moment.gamePk, moment.playId, BROADCASTS[next]))
-            .catch(() => setHasError(true));
-        } else {
-          setHasError(true);
-        }
-      } else if (status === "readyToPlay") {
+        setHasError(true);
+      } else if (status === "readyToPlay" && didActivate.current) {
         player.play();
       }
     });
     return () => sub.remove();
-  }, [player, moment.gamePk, moment.playId]);
+  }, [player]);
 
   function activate() {
     if (!moment.gamePk || !moment.playId) {
       setHasError(true);
       return;
     }
-    broadcastIdx.current = 0;
+    didActivate.current = true;
     setHasError(false);
     setActive(true);
     player
-      .replaceAsync(cdnSource(moment.gamePk, moment.playId, BROADCASTS[0]))
+      .replaceAsync({ uri: proxyUrl(moment.gamePk, moment.playId) })
       .catch(() => setHasError(true));
   }
 
@@ -86,15 +104,14 @@ export default function VideoMomentCard({ moment, onLongPress }) {
     wpaNum > 0 ? "#4CAF50" : wpaNum < 0 ? colors.accent : colors.textSecondary;
 
   return (
-    <View style={styles.card} onStartShouldSetResponder={() => false}>
+    <View style={styles.card}>
       {/* 16:9 video area */}
       {active && !hasError ? (
-        // Plain View when active so native controls receive touches unblocked
         <View style={styles.videoArea}>
           <VideoView
             player={player}
             style={styles.video}
-            fullscreenOptions={{ supportedOrientations: "landscape" }}
+            nativeControls
             allowsPictureInPicture
             contentFit="contain"
           />
@@ -104,27 +121,31 @@ export default function VideoMomentCard({ moment, onLongPress }) {
           style={styles.videoArea}
           onPress={activate}
           onLongPress={onLongPress}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          <View style={styles.placeholder}>
+          {/* Thumbnail or dark background */}
+          {thumbnail ? (
+            <Image source={{ uri: thumbnail }} style={styles.thumbnail} resizeMode="cover" />
+          ) : (
+            <View style={styles.thumbnailPlaceholder} />
+          )}
+
+          {/* Overlay */}
+          <View style={styles.overlay}>
             {hasError ? (
-              <Ionicons
-                name="alert-circle-outline"
-                size={30}
-                color={colors.textMuted}
-              />
+              <Ionicons name="alert-circle-outline" size={30} color={colors.textMuted} />
+            ) : thumbLoading ? (
+              <ActivityIndicator color="rgba(255,255,255,0.6)" />
             ) : (
-              <Ionicons
-                name="play-circle-outline"
-                size={54}
-                color="rgba(255,255,255,0.85)"
-              />
+              <View style={styles.playButton}>
+                <Ionicons name="play" size={26} color="#fff" style={{ marginLeft: 3 }} />
+              </View>
             )}
           </View>
         </TouchableOpacity>
       )}
 
-      {/* Metadata row */}
+      {/* Metadata */}
       <View style={styles.info}>
         <View style={styles.infoTop}>
           <Text style={styles.playerName} numberOfLines={1}>
@@ -147,7 +168,12 @@ export default function VideoMomentCard({ moment, onLongPress }) {
         ) : null}
         {moment.savantUrl ? (
           <TouchableOpacity onPress={openInBrowser} style={styles.savantLink}>
-            <Ionicons name="open-outline" size={12} color={colors.textMuted} style={{ marginRight: 4 }} />
+            <Ionicons
+              name="open-outline"
+              size={12}
+              color={colors.textMuted}
+              style={{ marginRight: 4 }}
+            />
             <Text style={styles.savantLinkText}>View on Savant</Text>
           </TouchableOpacity>
         ) : null}
@@ -173,11 +199,28 @@ const styles = StyleSheet.create({
   video: {
     flex: 1,
   },
-  placeholder: {
-    flex: 1,
+  thumbnail: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  thumbnailPlaceholder: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#0d0d0d",
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#0a0a0a",
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+  playButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.8)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   info: {
     padding: 12,
