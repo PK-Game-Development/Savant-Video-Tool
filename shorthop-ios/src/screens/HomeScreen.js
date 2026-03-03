@@ -343,35 +343,21 @@ export default function HomeScreen({ navigation }) {
         getLoginDatesInRange(start, end),
       ]);
 
-      const dots = {};
+      const loginSet = new Set(loginDates);
+      const momentDateSet = new Set(moments.map((m) => m.date));
+      const marked = {};
 
-      // Past login days → red selected circle
-      for (const date of loginDates) {
-        if (!dots[date]) dots[date] = { dots: [] };
-        dots[date].selected = true;
-        dots[date].selectedColor = colors.accent;
-      }
-
-      // Moment dots (layered on top of login circles)
-      for (const m of moments) {
-        if (!dots[m.date]) dots[m.date] = { dots: [] };
-        const dotColor =
-          m.autoSaveType === "mlb"
-            ? colors.autoSaveMlb
-            : m.autoSaveType === "team"
-            ? colors.autoSaveTeam
-            : colors.manualSave;
-        if (!dots[m.date].dots.find((d) => d.color === dotColor)) {
-          dots[m.date].dots.push({ color: dotColor, key: m.autoSaveType || "manual" });
+      // Days with both a login and a saved moment → red number
+      for (const date of loginSet) {
+        if (momentDateSet.has(date) && date !== today) {
+          marked[date] = { customStyles: { text: { color: colors.accent } } };
         }
       }
 
-      // Today → gold (always overrides login-day red)
-      if (!dots[today]) dots[today] = { dots: [] };
-      dots[today].selected = true;
-      dots[today].selectedColor = colors.today;
+      // Today → gold number (always)
+      marked[today] = { customStyles: { text: { color: colors.today } } };
 
-      setMarkedDates(dots);
+      setMarkedDates(marked);
     } catch {
       // Non-critical
     }
@@ -496,7 +482,7 @@ export default function HomeScreen({ navigation }) {
             minDate="2017-01-01"
             onDayPress={onDayPress}
             onMonthChange={onMonthChange}
-            markingType="multi-dot"
+            markingType="custom"
             markedDates={markedDates}
             renderHeader={() => (
               <TouchableOpacity
@@ -520,8 +506,6 @@ export default function HomeScreen({ navigation }) {
               backgroundColor: colors.background,
               calendarBackground: colors.background,
               textSectionTitleColor: colors.textMuted,
-              selectedDayBackgroundColor: colors.accent,
-              selectedDayTextColor: "#fff",
               todayTextColor: colors.today,
               dayTextColor: colors.textPrimary,
               textDisabledColor: colors.textMuted,
