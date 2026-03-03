@@ -1,3 +1,4 @@
+
 /**
  * AppNavigator — switches between AuthStack and MainStack based on Firebase auth state
  * and whether the user has completed onboarding (favoriteTeam set).
@@ -6,6 +7,7 @@
 import React, { useEffect, useState } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../services/firebase";
 import { getUserProfile } from "../services/moments";
@@ -16,9 +18,13 @@ import HomeScreen from "../screens/HomeScreen";
 import DayScreen from "../screens/DayScreen";
 import AddMomentScreen from "../screens/AddMomentScreen";
 import GamePlaysScreen from "../screens/GamePlaysScreen";
-import SettingsScreen from "../screens/SettingsScreen";
+import ProfileScreen from "../screens/ProfileScreen";
+import SavedMomentsScreen from "../screens/SavedMomentsScreen";
+
+import BottomTabBar from "./BottomTabBar";
 
 const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
 
 const screenOptions = {
   headerShown: false,
@@ -30,6 +36,16 @@ function dayOptions({ route }) {
   return {
     animation: route.params?.direction === "backward" ? "slide_from_left" : "slide_from_right",
   };
+}
+
+function MainTabs() {
+  return (
+    <Tab.Navigator tabBar={(props) => <BottomTabBar {...props} />}>
+      <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="SavedMoments" component={SavedMomentsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+    </Tab.Navigator>
+  );
 }
 
 export default function AppNavigator() {
@@ -58,11 +74,10 @@ export default function AppNavigator() {
     return (
       <NavigationContainer>
         <Stack.Navigator screenOptions={screenOptions}>
-          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Main" component={MainTabs} />
           <Stack.Screen name="Day" component={DayScreen} options={dayOptions} />
           <Stack.Screen name="AddMoment" component={AddMomentScreen} />
           <Stack.Screen name="GamePlays" component={GamePlaysScreen} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     );
@@ -89,10 +104,10 @@ export default function AppNavigator() {
           />
         ) : (
           <>
-            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Day" component={DayScreen} options={dayOptions} />
             <Stack.Screen name="AddMoment" component={AddMomentScreen} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="GamePlays" component={GamePlaysScreen} />
           </>
         )}
       </Stack.Navigator>

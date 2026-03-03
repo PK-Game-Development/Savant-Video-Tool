@@ -1,5 +1,6 @@
 /**
- * SettingsScreen — change favorite team, sign out.
+ * ProfileScreen — stats, favorite team, account settings, sign out.
+ * Tab screen — no back button.
  */
 
 import React, { useState, useEffect } from "react";
@@ -8,26 +9,43 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   Alert,
   ActivityIndicator,
   ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback } from "react";
 import { auth } from "../services/firebase";
 import { signOut } from "../services/auth";
-import { getUserProfile, setUserProfile } from "../services/moments";
+import { getUserProfile, setUserProfile, getAllMoments } from "../services/moments";
 import { TEAMS } from "../constants/teams";
 import colors from "../constants/colors";
 
-export default function SettingsScreen({ navigation }) {
+export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
   const [editingTeam, setEditingTeam] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [stats, setStats] = useState(null);
 
-  useEffect(() => {
-    getUserProfile().then(setProfile).catch(() => {});
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      getUserProfile().then(setProfile).catch(() => {});
+      loadStats();
+    }, [])
+  );
+
+  async function loadStats() {
+    try {
+      const all = await getAllMoments();
+      const totalMoments = all.length;
+      const distinctDays = new Set(all.map((m) => m.date)).size;
+      const distinctMonths = new Set(all.map((m) => m.date.slice(0, 7))).size;
+      setStats({ totalMoments, distinctDays, distinctMonths });
+    } catch {
+      setStats(null);
+    }
+  }
 
   async function handleSelectTeam(code) {
     setSaving(true);
@@ -65,17 +83,32 @@ export default function SettingsScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="chevron-back" size={26} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Settings</Text>
-        <View style={{ width: 26 }} />
+        <Text style={styles.wordmark}>profile</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+        {/* Stats */}
+        {stats && (
+          <>
+            <Text style={styles.sectionLabel}>YOUR STATS</Text>
+            <View style={styles.statsRow}>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{stats.totalMoments}</Text>
+                <Text style={styles.statLabel}>moments</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{stats.distinctDays}</Text>
+                <Text style={styles.statLabel}>days</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{stats.distinctMonths}</Text>
+                <Text style={styles.statLabel}>months</Text>
+              </View>
+            </View>
+          </>
+        )}
+
         {/* Account */}
         <Text style={styles.sectionLabel}>ACCOUNT</Text>
         <View style={styles.card}>
@@ -149,8 +182,8 @@ export default function SettingsScreen({ navigation }) {
         <View style={styles.card}>
           <Text style={styles.cardLabel}>How auto-save works</Text>
           <Text style={styles.cardBody}>
-            Every day, Shorthop saves the highest Win Probability Added (WPA) play for MLB and for your team.
-            Clips are posted by MLB a few hours after games go final — usually by morning.
+            Every day, Shorthop saves the highest Win Probability Added (WPA) play for MLB and for
+            your team. Clips are posted by MLB a few hours after games go final — usually by morning.
             You can always add your own plays too.
           </Text>
         </View>
@@ -170,20 +203,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingTop: 60,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
   },
-  title: {
+  wordmark: {
     color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: "300",
-    letterSpacing: 0.5,
+    fontSize: 22,
+    fontWeight: "200",
+    letterSpacing: 4,
   },
   content: {
     padding: 20,
@@ -196,6 +226,33 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 8,
     marginTop: 24,
+  },
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 4,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  statNumber: {
+    color: colors.textPrimary,
+    fontSize: 24,
+    fontWeight: "200",
+    letterSpacing: 1,
+  },
+  statLabel: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: "600",
+    letterSpacing: 1,
+    marginTop: 3,
   },
   card: {
     backgroundColor: colors.surface,

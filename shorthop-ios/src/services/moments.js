@@ -125,6 +125,23 @@ export async function getMomentsInRange(startDate, endDate) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+export async function getAllMoments() {
+  const uid = auth.currentUser?.uid;
+
+  if (!uid) {
+    const all = await localGetAll();
+    return all.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  const q = query(
+    collection(db, "users", uid, "moments"),
+    orderBy("date", "asc"),
+    orderBy("createdAt", "asc")
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
 export async function deleteMoment(momentId) {
   const uid = auth.currentUser?.uid;
 

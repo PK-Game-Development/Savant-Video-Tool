@@ -43,6 +43,7 @@ import { prefetchMoments, prefetchHighlights } from "../services/prefetch";
 import MomentCard from "../components/MomentCard";
 import colors from "../constants/colors";
 import { teamName } from "../constants/teams";
+import { useCalendar } from "../context/CalendarContext";
 
 const SCREEN_W = Dimensions.get("window").width;
 
@@ -311,6 +312,7 @@ export default function HomeScreen({ navigation }) {
   const today = todayStr();
   const [currentMonth, setCurrentMonth] = useState(today.slice(0, 7) + "-01");
   const [calendarKey, setCalendarKey] = useState(0);
+  const { setCurrentMonth: setContextMonth } = useCalendar();
   const [animDirection, setAnimDirection] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [markedDates, setMarkedDates] = useState({});
@@ -325,6 +327,11 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     getUserProfile().then(setProfile).catch(() => {});
   }, []);
+
+  // Keep CalendarContext in sync so SavedMomentsScreen knows where to scroll
+  useEffect(() => {
+    setContextMonth(currentMonth);
+  }, [currentMonth]);
 
   // Reload calendar dots and today's moments whenever the screen is focused
   useFocusEffect(
@@ -477,12 +484,6 @@ export default function HomeScreen({ navigation }) {
     >
       <View style={styles.header}>
         <Text style={styles.wordmark}>shorthop</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate("Settings")}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="settings-outline" size={22} color={colors.textSecondary} />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.calendarWrapper}>
@@ -617,7 +618,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    paddingBottom: 40,
+    paddingBottom: 90,
   },
   header: {
     flexDirection: "row",
