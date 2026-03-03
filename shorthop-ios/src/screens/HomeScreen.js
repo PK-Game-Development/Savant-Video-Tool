@@ -344,18 +344,32 @@ export default function HomeScreen({ navigation }) {
       ]);
 
       const loginSet = new Set(loginDates);
-      const momentDateSet = new Set(moments.map((m) => m.date));
       const marked = {};
+
+      // Moment dots per date
+      for (const m of moments) {
+        if (!marked[m.date]) marked[m.date] = { dots: [] };
+        const dotColor =
+          m.autoSaveType === "mlb"
+            ? colors.autoSaveMlb
+            : m.autoSaveType === "team"
+            ? colors.autoSaveTeam
+            : colors.manualSave;
+        if (!marked[m.date].dots.find((d) => d.color === dotColor)) {
+          marked[m.date].dots.push({ color: dotColor });
+        }
+      }
 
       // Days with both a login and a saved moment → red number
       for (const date of loginSet) {
-        if (momentDateSet.has(date) && date !== today) {
-          marked[date] = { customStyles: { text: { color: colors.accent } } };
+        if (marked[date] && date !== today) {
+          marked[date].textColor = colors.accent;
         }
       }
 
       // Today → gold number (always)
-      marked[today] = { customStyles: { text: { color: colors.today } } };
+      if (!marked[today]) marked[today] = { dots: [] };
+      marked[today].textColor = colors.today;
 
       setMarkedDates(marked);
     } catch {
@@ -482,8 +496,36 @@ export default function HomeScreen({ navigation }) {
             minDate="2017-01-01"
             onDayPress={onDayPress}
             onMonthChange={onMonthChange}
-            markingType="custom"
             markedDates={markedDates}
+            dayComponent={({ date, state, marking, onPress }) => {
+              if (!date) return <View />;
+              const isDisabled = state === "disabled";
+              const textColor = isDisabled
+                ? colors.textMuted
+                : marking?.textColor || colors.textPrimary;
+              return (
+                <TouchableOpacity
+                  onPress={() => onPress(date)}
+                  style={styles.dayCell}
+                  activeOpacity={0.6}
+                  disabled={isDisabled}
+                >
+                  <Text style={[styles.dayNum, { color: textColor }]}>
+                    {date.day}
+                  </Text>
+                  {marking?.dots?.length > 0 && (
+                    <View style={styles.dayDots}>
+                      {marking.dots.slice(0, 3).map((dot, i) => (
+                        <View
+                          key={i}
+                          style={[styles.dayDot, { backgroundColor: dot.color }]}
+                        />
+                      ))}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            }}
             renderHeader={() => (
               <TouchableOpacity
                 onPress={openPicker}
@@ -506,18 +548,11 @@ export default function HomeScreen({ navigation }) {
               backgroundColor: colors.background,
               calendarBackground: colors.background,
               textSectionTitleColor: colors.textMuted,
-              todayTextColor: colors.today,
-              dayTextColor: colors.textPrimary,
-              textDisabledColor: colors.textMuted,
-              dotColor: colors.accent,
-              selectedDotColor: "#fff",
               arrowColor: colors.textSecondary,
               disabledArrowColor: colors.textMuted,
               monthTextColor: colors.textPrimary,
-              indicatorColor: colors.accent,
-              textDayFontSize: 14,
-              textMonthFontSize: 16,
               textDayHeaderFontSize: 11,
+              textMonthFontSize: 16,
               textMonthFontWeight: "300",
             }}
             style={styles.calendar}
@@ -601,6 +636,25 @@ const styles = StyleSheet.create({
   },
   calendar: {
     marginHorizontal: 0,
+  },
+  dayCell: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+    flex: 1,
+  },
+  dayNum: {
+    fontSize: 14,
+  },
+  dayDots: {
+    flexDirection: "row",
+    gap: 3,
+    marginTop: 2,
+  },
+  dayDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
   },
   calendarHeaderBtn: {
     flexDirection: "row",
