@@ -50,6 +50,7 @@ function ScoreboardCard({ game, onPress, colors, styles }) {
     >
       {/* Away team */}
       <View style={styles.teamBlock}>
+        <Text style={styles.teamRoleLabel}>AWAY</Text>
         <View style={[styles.teamColorBar, { backgroundColor: awayColor }]} />
         <Text style={[styles.abbr, !awayWin && isFinal && styles.abbrLoser]}>
           {game.away.abbr}
@@ -83,6 +84,7 @@ function ScoreboardCard({ game, onPress, colors, styles }) {
 
       {/* Home team */}
       <View style={[styles.teamBlock, styles.teamBlockRight]}>
+        <Text style={styles.teamRoleLabel}>HOME</Text>
         <View style={[styles.teamColorBar, { backgroundColor: homeColor }]} />
         <Text style={[styles.abbr, !homeWin && isFinal && styles.abbrLoser]}>
           {game.home.abbr}
@@ -226,6 +228,13 @@ function makeStyles(colors) {
   },
   teamBlockRight: {
     alignItems: "flex-end",
+  },
+  teamRoleLabel: {
+    color: colors.textMuted,
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    marginBottom: 3,
   },
   teamColorBar: {
     width: 28,

@@ -173,6 +173,7 @@ export default function GamePlaysScreen({ route, navigation }) {
 
         <View style={styles.scoreboard}>
           <View style={styles.scoreTeam}>
+            <Text style={styles.teamRoleLabel}>AWAY</Text>
             <View style={[styles.teamBar, { backgroundColor: awayTeam?.color || colors.textMuted }]} />
             <Text style={styles.scoreAbbr}>{awayAbbr}</Text>
             <Text style={styles.scoreNum}>{awayScore ?? "—"}</Text>
@@ -181,6 +182,7 @@ export default function GamePlaysScreen({ route, navigation }) {
             <Text style={styles.statusLabel}>{isFinal ? "FINAL" : status?.toUpperCase()}</Text>
           </View>
           <View style={[styles.scoreTeam, styles.scoreTeamRight]}>
+            <Text style={styles.teamRoleLabel}>HOME</Text>
             <View style={[styles.teamBar, { backgroundColor: homeTeam?.color || colors.textMuted }]} />
             <Text style={styles.scoreAbbr}>{homeAbbr}</Text>
             <Text style={styles.scoreNum}>{homeScore ?? "—"}</Text>
@@ -252,6 +254,13 @@ function makeStyles(colors) {
   },
   scoreTeamRight: {
     alignItems: "center",
+  },
+  teamRoleLabel: {
+    color: colors.textMuted,
+    fontSize: 9,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+    marginBottom: 3,
   },
   teamBar: {
     width: 24,
