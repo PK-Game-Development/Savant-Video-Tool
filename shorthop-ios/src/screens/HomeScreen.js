@@ -325,7 +325,7 @@ function monthRange(dateStr) {
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
 export default function HomeScreen({ navigation }) {
-  const { colors: themeColors } = useTheme();
+  const { colors: themeColors, themeTeamCode } = useTheme();
   const calendarShellColor = "#1F1F1F";
   const themedCalendarKey = `${calendarKey}-${calendarShellColor}-${themeColors.textPrimary}`;
   const today = todayStr();
@@ -459,7 +459,7 @@ export default function HomeScreen({ navigation }) {
     prefetchHighlights(day.dateString, null, () =>
       getHighlights({ date: day.dateString, team: null, limit: 50 })
     );
-    navigation.navigate("Day", { date: day.dateString });
+    navigation.push("Day", { date: day.dateString });
   }
 
   function onMonthChange(month) {
@@ -521,7 +521,7 @@ export default function HomeScreen({ navigation }) {
           styles.calendarWrapper,
           {
             backgroundColor: calendarShellColor,
-            borderColor: themeColors.accent,
+            borderColor: themeTeamCode === "SHORTHOP" ? themeColors.border : themeColors.accent,
           },
         ]}
       >

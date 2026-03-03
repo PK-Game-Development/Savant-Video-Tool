@@ -238,7 +238,7 @@ export default function SavedMomentsScreen({ navigation }) {
               >
                 <MomentCard
                   moment={moment}
-                  onPress={() => navigation.navigate("Day", { date: moment.date })}
+                  onPress={() => navigation.push("Day", { date: moment.date })}
                 />
               </Swipeable>
             ))}
