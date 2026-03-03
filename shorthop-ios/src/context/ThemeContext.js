@@ -52,140 +52,7 @@ function mixHex(baseHex, targetHex, targetWeight) {
   );
 }
 
-function makeColors(themeCode, teamHex) {
-  if (themeCode === "ARI") {
-    // Diamondbacks: purple + teal
-    return {
-      background: "#2E0A4F",
-      surface: "#3C1466",
-      surfaceElevated: "#4A1F7A",
-      border: "#2EC4B6",
-      accent: "#2EC4B6",
-      accentMuted: "#1E8F85",
-      today: "#D4AF37",
-      textPrimary: "#FFFFFF",
-      textSecondary: "#DCCAF0",
-      textMuted: "#BFA7DB",
-      autoSaveMlb: "#C8102E",
-      autoSaveTeam: "#2EC4B6",
-      manualSave: "#FFFFFF",
-    };
-  }
-
-  if (themeCode === "MIA") {
-    // Marlins: black + classic teal
-    return {
-      background: "#0A0A0A",
-      surface: "#151515",
-      surfaceElevated: "#1F1F1F",
-      border: "#00AFA0",
-      accent: "#00AFA0",
-      accentMuted: "#007C72",
-      today: "#D4AF37",
-      textPrimary: "#FFFFFF",
-      textSecondary: "#BEEBE7",
-      textMuted: "#7CCBC3",
-      autoSaveMlb: "#C8102E",
-      autoSaveTeam: "#00AFA0",
-      manualSave: "#FFFFFF",
-    };
-  }
-
-  if (themeCode === "BOS") {
-    // Red Sox: same setup as Braves (primary navy, secondary red)
-    return {
-      background: "#0A1D3A",
-      surface: "#132B50",
-      surfaceElevated: "#1B3B67",
-      border: "#CE1141",
-      accent: "#CE1141",
-      accentMuted: "#7E0A28",
-      today: "#D4AF37",
-      textPrimary: "#FFFFFF",
-      textSecondary: "#D2DDF0",
-      textMuted: "#A2B4D3",
-      autoSaveMlb: "#C8102E",
-      autoSaveTeam: "#CE1141",
-      manualSave: "#FFFFFF",
-    };
-  }
-
-  if (themeCode === "CLE") {
-    // Guardians: same setup as Braves (primary navy, secondary red)
-    return {
-      background: "#0A1D3A",
-      surface: "#132B50",
-      surfaceElevated: "#1B3B67",
-      border: "#CE1141",
-      accent: "#CE1141",
-      accentMuted: "#7E0A28",
-      today: "#D4AF37",
-      textPrimary: "#FFFFFF",
-      textSecondary: "#D2DDF0",
-      textMuted: "#A2B4D3",
-      autoSaveMlb: "#C8102E",
-      autoSaveTeam: "#CE1141",
-      manualSave: "#FFFFFF",
-    };
-  }
-
-  if (themeCode === "CWS") {
-    // White Sox: primary black, secondary red
-    return {
-      background: "#0A0A0A",
-      surface: "#151515",
-      surfaceElevated: "#202020",
-      border: "#A32028",
-      accent: "#A32028",
-      accentMuted: "#66141A",
-      today: "#D4AF37",
-      textPrimary: "#FFFFFF",
-      textSecondary: "#D6D6D6",
-      textMuted: "#A7A7A7",
-      autoSaveMlb: "#C8102E",
-      autoSaveTeam: "#A32028",
-      manualSave: "#FFFFFF",
-    };
-  }
-
-  if (themeCode === "ATL") {
-    // Braves: primary navy, secondary red
-    return {
-      background: "#0A1D3A",
-      surface: "#132B50",
-      surfaceElevated: "#1B3B67",
-      border: "#CE1141",
-      accent: "#CE1141",
-      accentMuted: "#7E0A28",
-      today: "#D4AF37",
-      textPrimary: "#FFFFFF",
-      textSecondary: "#D2DDF0",
-      textMuted: "#A2B4D3",
-      autoSaveMlb: "#C8102E",
-      autoSaveTeam: "#CE1141",
-      manualSave: "#FFFFFF",
-    };
-  }
-
-  if (themeCode === "OAK") {
-    // Athletics: green primary, gold secondary
-    return {
-      background: "#0E2A1F",
-      surface: "#174130",
-      surfaceElevated: "#205944",
-      border: "#EFB21E",
-      accent: "#EFB21E",
-      accentMuted: "#9E7614",
-      today: "#D4AF37",
-      textPrimary: "#FFFFFF",
-      textSecondary: "#D8E7DE",
-      textMuted: "#A9C2B3",
-      autoSaveMlb: "#C8102E",
-      autoSaveTeam: "#EFB21E",
-      manualSave: "#FFFFFF",
-    };
-  }
-
+function makeColors(themeCode, teamPrimaryHex, teamSecondaryHex) {
   if (themeCode === MLB_THEME) {
     return {
       background: "#0A2B59",
@@ -222,25 +89,25 @@ function makeColors(themeCode, teamHex) {
     };
   }
 
-  const accent = teamHex || "#C8102E";
-  const background = mixHex(accent, "#000000", 0.82);
-  const surface = mixHex(accent, "#000000", 0.72);
-  const surfaceElevated = mixHex(accent, "#000000", 0.62);
-  const border = mixHex(accent, "#FFFFFF", 0.34);
+  const primary = teamPrimaryHex || "#C8102E";
+  const secondary = teamSecondaryHex || darkenHex(primary, 0.65);
+  const background = mixHex(secondary, "#000000", 0.78);
+  const surface = mixHex(secondary, "#000000", 0.68);
+  const surfaceElevated = mixHex(secondary, "#000000", 0.58);
 
   return {
     background,
     surface,
     surfaceElevated,
-    border,
-    accent,
-    accentMuted: darkenHex(accent, 0.6),
+    border: secondary,
+    accent: primary,
+    accentMuted: darkenHex(primary, 0.6),
     today: "#D4AF37",
     textPrimary: "#FFFFFF",
-    textSecondary: mixHex("#D6D6D6", accent, 0.16),
-    textMuted: mixHex("#9D9D9D", accent, 0.14),
+    textSecondary: mixHex("#D6D6D6", secondary, 0.2),
+    textMuted: mixHex("#9D9D9D", secondary, 0.18),
     autoSaveMlb: "#C8102E",
-    autoSaveTeam: accent,
+    autoSaveTeam: primary,
     manualSave: "#FFFFFF",
   };
 }
@@ -294,8 +161,11 @@ export function ThemeProvider({ children }) {
   }
 
   const safeThemeCode = themeTeamCode || SHORTHOP_THEME;
-  const teamHex = TEAMS.find((t) => t.code === safeThemeCode)?.color;
-  const colors = useMemo(() => makeColors(safeThemeCode, teamHex), [safeThemeCode, teamHex]);
+  const team = TEAMS.find((t) => t.code === safeThemeCode);
+  const colors = useMemo(
+    () => makeColors(safeThemeCode, team?.primary || team?.color, team?.secondary),
+    [safeThemeCode, team?.primary, team?.color, team?.secondary]
+  );
   const value = useMemo(
     () => ({ colors, themeTeamCode, setThemeTeam }),
     [colors, themeTeamCode]

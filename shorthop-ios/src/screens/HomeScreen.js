@@ -343,23 +343,34 @@ export default function HomeScreen({ navigation }) {
   const displayYear = parseInt(currentMonth.slice(0, 4));
   const displayMonth = parseInt(currentMonth.slice(5, 7));
 
-  // Load user profile once
-  useEffect(() => {
-    getUserProfile().then(setProfile).catch(() => {});
-  }, []);
-
   // Keep CalendarContext in sync so SavedMomentsScreen knows where to scroll
   useEffect(() => {
     setContextMonth(currentMonth);
   }, [currentMonth]);
 
-  // Reload calendar dots and preview moments whenever the screen is focused
+  // Reload calendar dots and preview moments whenever the screen is focused.
+  // This keeps suggested plays in sync when favorite team changes in Profile.
   useFocusEffect(
     useCallback(() => {
+      let active = true;
       recordLoginDate(today).catch(() => {});
       loadCalendarDots(currentMonth);
-      loadPreviewMoments();
-    }, [currentMonth, profile, themeColors])
+      getUserProfile()
+        .then((nextProfile) => {
+          if (!active) return;
+          setProfile(nextProfile || null);
+          loadPreviewMoments(nextProfile || null);
+        })
+        .catch(() => {
+          if (!active) return;
+          setProfile(null);
+          setPreviewMoments([]);
+          setLoadingPreview(false);
+        });
+      return () => {
+        active = false;
+      };
+    }, [currentMonth, themeColors, today])
   );
 
   async function loadCalendarDots(monthStart) {
@@ -399,10 +410,10 @@ export default function HomeScreen({ navigation }) {
     }
   }
 
-  async function loadPreviewMoments() {
+  async function loadPreviewMoments(profileArg = profile) {
     setLoadingPreview(true);
     try {
-      if (!profile?.favoriteTeam) {
+      if (!profileArg?.favoriteTeam) {
         setPreviewMoments([]);
         return;
       }
@@ -411,8 +422,8 @@ export default function HomeScreen({ navigation }) {
       const gameMap = new Map(games.map((g) => [String(g.game_pk), g]));
       const relevantGames = games.filter(
         (g) =>
-          g?.away?.abbr?.toUpperCase() === profile.favoriteTeam ||
-          g?.home?.abbr?.toUpperCase() === profile.favoriteTeam
+          g?.away?.abbr?.toUpperCase() === profileArg.favoriteTeam ||
+          g?.home?.abbr?.toUpperCase() === profileArg.favoriteTeam
       );
 
       const playsByGame = await Promise.all(
