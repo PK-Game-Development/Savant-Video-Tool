@@ -5,6 +5,7 @@ export default {
   border: "#2A2A2A",
   accent: "#C8102E",       // MLB red
   accentMuted: "#8B0A1F",
+  today: "#D4AF37",        // gold — today's date on calendar
   textPrimary: "#FFFFFF",
   textSecondary: "#888888",
   textMuted: "#555555",

@@ -35,6 +35,8 @@ import {
   getMomentsForDate,
   saveMoment,
   getUserProfile,
+  recordLoginDate,
+  getLoginDatesInRange,
 } from "../services/moments";
 import { getTopPlay, getHighlights } from "../services/savantApi";
 import { prefetchMoments, prefetchHighlights } from "../services/prefetch";
@@ -327,6 +329,7 @@ export default function HomeScreen({ navigation }) {
   // Reload calendar dots and today's moments whenever the screen is focused
   useFocusEffect(
     useCallback(() => {
+      recordLoginDate(today).catch(() => {});
       loadCalendarDots(currentMonth);
       loadTodayMoments();
     }, [currentMonth, profile])
@@ -335,8 +338,21 @@ export default function HomeScreen({ navigation }) {
   async function loadCalendarDots(monthStart) {
     const { start, end } = monthRange(monthStart);
     try {
-      const moments = await getMomentsInRange(start, end);
+      const [moments, loginDates] = await Promise.all([
+        getMomentsInRange(start, end),
+        getLoginDatesInRange(start, end),
+      ]);
+
       const dots = {};
+
+      // Past login days → red selected circle
+      for (const date of loginDates) {
+        if (!dots[date]) dots[date] = { dots: [] };
+        dots[date].selected = true;
+        dots[date].selectedColor = colors.accent;
+      }
+
+      // Moment dots (layered on top of login circles)
       for (const m of moments) {
         if (!dots[m.date]) dots[m.date] = { dots: [] };
         const dotColor =
@@ -349,9 +365,12 @@ export default function HomeScreen({ navigation }) {
           dots[m.date].dots.push({ color: dotColor, key: m.autoSaveType || "manual" });
         }
       }
+
+      // Today → gold (always overrides login-day red)
       if (!dots[today]) dots[today] = { dots: [] };
       dots[today].selected = true;
-      dots[today].selectedColor = colors.accent;
+      dots[today].selectedColor = colors.today;
+
       setMarkedDates(dots);
     } catch {
       // Non-critical
@@ -503,7 +522,7 @@ export default function HomeScreen({ navigation }) {
               textSectionTitleColor: colors.textMuted,
               selectedDayBackgroundColor: colors.accent,
               selectedDayTextColor: "#fff",
-              todayTextColor: colors.accent,
+              todayTextColor: colors.today,
               dayTextColor: colors.textPrimary,
               textDisabledColor: colors.textMuted,
               dotColor: colors.accent,

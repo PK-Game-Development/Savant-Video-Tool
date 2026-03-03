@@ -157,3 +157,42 @@ export async function getSavedPlayIds(date) {
   const moments = await getMomentsForDate(date);
   return new Set(moments.map((m) => m.playId));
 }
+
+// ─── Login dates ───────────────────────────────────────────────────────────────
+//   users/{uid}/loginDates/{dateStr}  — one doc per day the user opened the app
+
+const LOCAL_LOGIN_KEY = "shorthop_login_dates";
+
+export async function recordLoginDate(dateStr) {
+  const uid = auth.currentUser?.uid;
+
+  if (!uid) {
+    const raw = await AsyncStorage.getItem(LOCAL_LOGIN_KEY);
+    const dates = raw ? JSON.parse(raw) : [];
+    if (!dates.includes(dateStr)) {
+      await AsyncStorage.setItem(LOCAL_LOGIN_KEY, JSON.stringify([...dates, dateStr]));
+    }
+    return;
+  }
+
+  // Document ID = date string → naturally idempotent
+  await setDoc(doc(db, "users", uid, "loginDates", dateStr), { date: dateStr }, { merge: true });
+}
+
+export async function getLoginDatesInRange(startDate, endDate) {
+  const uid = auth.currentUser?.uid;
+
+  if (!uid) {
+    const raw = await AsyncStorage.getItem(LOCAL_LOGIN_KEY);
+    const dates = raw ? JSON.parse(raw) : [];
+    return dates.filter((d) => d >= startDate && d <= endDate);
+  }
+
+  const q = query(
+    collection(db, "users", uid, "loginDates"),
+    where("date", ">=", startDate),
+    where("date", "<=", endDate)
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => d.data().date);
+}
