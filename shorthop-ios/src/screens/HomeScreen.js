@@ -500,6 +500,7 @@ export default function HomeScreen({ navigation }) {
             dayComponent={({ date, state, marking, onPress }) => {
               if (!date) return <View />;
               const isDisabled = state === "disabled";
+              const isToday = date.dateString === today;
               const textColor = isDisabled
                 ? colors.textMuted
                 : marking?.textColor || colors.textPrimary;
@@ -510,9 +511,11 @@ export default function HomeScreen({ navigation }) {
                   activeOpacity={0.6}
                   disabled={isDisabled}
                 >
-                  <Text style={[styles.dayNum, { color: textColor }]}>
-                    {date.day}
-                  </Text>
+                  <View style={[styles.dayNumWrap, isToday && styles.dayNumWrapToday]}>
+                    <Text style={[styles.dayNum, { color: textColor }]}>
+                      {date.day}
+                    </Text>
+                  </View>
                   {marking?.dots?.length > 0 && (
                     <View style={styles.dayDots}>
                       {marking.dots.slice(0, 3).map((dot, i) => (
@@ -642,6 +645,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 4,
     flex: 1,
+  },
+  dayNumWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayNumWrapToday: {
+    borderWidth: 1,
+    borderColor: colors.today,
   },
   dayNum: {
     fontSize: 14,
