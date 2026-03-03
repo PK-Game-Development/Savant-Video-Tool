@@ -1133,7 +1133,7 @@ def stream_video(play_id):
     if "Range" in request.headers:
         video_headers["Range"] = request.headers["Range"]
 
-    for broadcast in ["home", "away"]:
+    for broadcast in ["home", "away", "network", "national"]:
         url = VIDEO_CDN_URL.format(game_pk=game_pk, broadcast=broadcast, play_id=play_id)
         try:
             resp = session.get(url, stream=True, timeout=(5, 60), headers=video_headers)
