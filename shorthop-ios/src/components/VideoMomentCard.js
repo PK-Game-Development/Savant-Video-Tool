@@ -35,7 +35,6 @@ export default function VideoMomentCard({ moment, onLongPress }) {
 
   const player = useVideoPlayer(null, (p) => {
     p.loop = false;
-    p.muted = true;
   });
 
   // Attach listener at mount so no status events are ever missed.
@@ -89,13 +88,9 @@ export default function VideoMomentCard({ moment, onLongPress }) {
   return (
     <View style={styles.card} onStartShouldSetResponder={() => false}>
       {/* 16:9 video area */}
-      <TouchableOpacity
-        style={styles.videoArea}
-        onPress={active ? undefined : activate}
-        onLongPress={onLongPress}
-        activeOpacity={active ? 1 : 0.8}
-      >
-        {active && !hasError ? (
+      {active && !hasError ? (
+        // Plain View when active so native controls receive touches unblocked
+        <View style={styles.videoArea}>
           <VideoView
             player={player}
             style={styles.video}
@@ -103,7 +98,14 @@ export default function VideoMomentCard({ moment, onLongPress }) {
             allowsPictureInPicture
             contentFit="contain"
           />
-        ) : (
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.videoArea}
+          onPress={activate}
+          onLongPress={onLongPress}
+          activeOpacity={0.8}
+        >
           <View style={styles.placeholder}>
             {hasError ? (
               <Ionicons
@@ -119,8 +121,8 @@ export default function VideoMomentCard({ moment, onLongPress }) {
               />
             )}
           </View>
-        )}
-      </TouchableOpacity>
+        </TouchableOpacity>
+      )}
 
       {/* Metadata row */}
       <View style={styles.info}>
