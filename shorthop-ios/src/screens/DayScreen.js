@@ -14,7 +14,7 @@ import {
   Platform,
   UIManager,
 } from "react-native";
-import { Swipeable } from "react-native-gesture-handler";
+import { Swipeable, GestureDetector, Gesture } from "react-native-gesture-handler";
 import Svg, { Rect, Line, Path } from "react-native-svg";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
@@ -109,6 +109,26 @@ export default function DayScreen({ route, navigation }) {
     }
   }
 
+  function navigateDay(delta) {
+    const d = new Date(date + "T12:00:00");
+    d.setDate(d.getDate() + delta);
+    const newDate = d.toISOString().split("T")[0];
+    // Don't go before Savant video archive
+    if (newDate < "2017-01-01") return;
+    // Don't go into the future
+    if (newDate > new Date().toISOString().split("T")[0]) return;
+    navigation.replace("Day", { date: newDate });
+  }
+
+  const daySwipe = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([-50, 50])
+    .failOffsetY([-20, 20])
+    .onEnd((e) => {
+      if (e.translationX < -60) navigateDay(1);
+      else if (e.translationX > 60) navigateDay(-1);
+    });
+
   async function handleDelete(moment) {
     try {
       await deleteMoment(moment.id);
@@ -130,6 +150,7 @@ export default function DayScreen({ route, navigation }) {
   }
 
   return (
+    <GestureDetector gesture={daySwipe}>
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity
@@ -165,6 +186,7 @@ export default function DayScreen({ route, navigation }) {
         <Text style={styles.addButtonText}>Add a moment</Text>
       </TouchableOpacity>
     </View>
+    </GestureDetector>
   );
 }
 

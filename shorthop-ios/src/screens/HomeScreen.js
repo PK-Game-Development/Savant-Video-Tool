@@ -22,6 +22,7 @@ import {
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { LinearGradient } from "expo-linear-gradient";
+import { GestureDetector, Gesture } from "react-native-gesture-handler";
 import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { onAuthStateChanged } from "firebase/auth";
@@ -385,6 +386,31 @@ export default function HomeScreen({ navigation }) {
     setPickerVisible(false);
   }
 
+  function goToMonth(delta) {
+    const [y, m] = currentMonth.split("-").map(Number);
+    let nm = m + delta;
+    let ny = y;
+    if (nm > 12) { nm = 1; ny += 1; }
+    if (nm < 1)  { nm = 12; ny -= 1; }
+    if (ny < 2017) return;
+    const todayYear = parseInt(today.slice(0, 4));
+    const todayMon  = parseInt(today.slice(5, 7));
+    if (ny > todayYear || (ny === todayYear && nm > todayMon)) return;
+    const dateStr = `${ny}-${String(nm).padStart(2, "0")}-01`;
+    setCurrentMonth(dateStr);
+    loadCalendarDots(dateStr);
+    setCalendarKey((k) => k + 1);
+  }
+
+  const calendarSwipe = Gesture.Pan()
+    .runOnJS(true)
+    .activeOffsetX([-25, 25])
+    .failOffsetY([-20, 20])
+    .onEnd((e) => {
+      if (e.translationX < -40) goToMonth(1);
+      else if (e.translationX > 40) goToMonth(-1);
+    });
+
   const autoSavedToday = todayMoments.filter((m) => m.isAutoSaved);
 
   return (
@@ -403,6 +429,7 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      <GestureDetector gesture={calendarSwipe}>
       <Calendar
         key={calendarKey}
         current={currentMonth}
@@ -451,6 +478,7 @@ export default function HomeScreen({ navigation }) {
         }}
         style={styles.calendar}
       />
+      </GestureDetector>
 
       {/* Auto-save strip */}
       <View style={styles.section}>
