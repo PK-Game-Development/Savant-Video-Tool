@@ -116,9 +116,13 @@ jobs = {}
 _player_cache = {}
 _PLAYER_CACHE_TTL = 300  # 5 minutes
 
-# Highlights cache: keyed by (date, team) -> (timestamp, data)
+# Highlights cache: keyed by (date, team, limit) -> (timestamp, data)
 _highlights_cache = {}
 _HIGHLIGHTS_CACHE_TTL = 600  # 10 minutes
+
+# Sorted rows cache: keyed by (date, team) -> (timestamp, game_date, sorted_pa_rows)
+# Shared across all limit values so the Statcast CSV is only downloaded once per date+team.
+_sorted_rows_cache = {}
 
 # Game feed cache: keyed by game_pk -> (play_map, matchup_map, duration_map)
 _game_feed_cache = {}
@@ -797,7 +801,7 @@ def api_highlights():
     except ValueError:
         limit = 15
 
-    cache_key = (date_param, team_param)
+    cache_key = (date_param, team_param, limit)
     cached = _highlights_cache.get(cache_key)
     if cached:
         cache_ts, cache_data = cached
@@ -805,6 +809,18 @@ def api_highlights():
             return jsonify(cache_data)
 
     session = create_session()
+
+    # Check if we already have sorted rows for this date+team (shared across limits).
+    rows_key = (date_param, team_param)
+    rows_cached = _sorted_rows_cache.get(rows_key)
+    if rows_cached:
+        cache_ts, game_date, pa_rows_all = rows_cached
+        if time.time() - cache_ts < _HIGHLIGHTS_CACHE_TTL:
+            pa_rows = pa_rows_all[:limit]
+            videos = _resolve_pa_rows_to_videos(pa_rows, session)
+            result = {"game_date": game_date, "videos": videos}
+            _highlights_cache[cache_key] = (time.time(), result)
+            return jsonify(result)
 
     if date_param:
         game_date = date_param
@@ -843,7 +859,7 @@ def api_highlights():
     if not rows:
         return jsonify({"error": "No Statcast data for this date yet."}), 404
 
-    pa_rows = []
+    pa_rows_all = []
     for row in rows:
         event = row.get("events", "").strip()
         wpa_str = row.get("delta_run_exp", "").strip()
@@ -852,11 +868,14 @@ def api_highlights():
                 row["_wpa"] = float(wpa_str)
             except ValueError:
                 continue
-            pa_rows.append(row)
+            pa_rows_all.append(row)
 
-    pa_rows.sort(key=lambda r: abs(r["_wpa"]), reverse=True)
-    pa_rows = pa_rows[:limit]
+    pa_rows_all.sort(key=lambda r: abs(r["_wpa"]), reverse=True)
 
+    # Cache all sorted rows so subsequent requests with different limits skip the CSV download.
+    _sorted_rows_cache[rows_key] = (time.time(), game_date, pa_rows_all)
+
+    pa_rows = pa_rows_all[:limit]
     videos = _resolve_pa_rows_to_videos(pa_rows, session)
 
     result = {

@@ -45,9 +45,11 @@ export default function AddMomentScreen({ route, navigation }) {
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [savedPlayIds, setSavedPlayIds] = useState(new Set());
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [saving, setSaving] = useState(null); // play_id being saved
   const [showTeamPicker, setShowTeamPicker] = useState(false);
   const playerSearchTimer = useRef(null);
+  const loadId = useRef(0);
 
   // Load default highlights and saved play IDs on mount
   useEffect(() => {
@@ -56,18 +58,38 @@ export default function AddMomentScreen({ route, navigation }) {
   }, [date]);
 
   async function loadHighlights(team = null) {
+    const myId = ++loadId.current;
     setLoading(true);
+    setLoadingMore(false);
     setPlays([]);
     setDisplayCount(20);
+
+    // Phase 1 — quick: fetch 6 plays and show them immediately.
+    getHighlights({ date, team, limit: 6 }).then((data) => {
+      if (loadId.current !== myId) return;
+      const videos = data?.videos || [];
+      if (videos.length) {
+        setPlays(videos);
+        setLoading(false);
+        setLoadingMore(true);
+      }
+    }).catch(() => {});
+
+    // Phase 2 — full: 50 plays (may hit prefetch cache from HomeScreen).
     try {
       const data = await consumeHighlights(date, team, () =>
         getHighlights({ date, team, limit: 50 })
       );
+      if (loadId.current !== myId) return;
       setPlays(data?.videos || []);
     } catch (err) {
+      if (loadId.current !== myId) return;
       Alert.alert("Could not load plays", err.message);
     } finally {
-      setLoading(false);
+      if (loadId.current === myId) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
     }
   }
 
@@ -256,7 +278,9 @@ export default function AddMomentScreen({ route, navigation }) {
             <Text style={styles.empty}>No plays found for this date.</Text>
           }
           ListFooterComponent={
-            displayCount < plays.length ? (
+            loadingMore ? (
+              <ActivityIndicator color={colors.textMuted} style={{ marginVertical: 16 }} />
+            ) : displayCount < plays.length ? (
               <ActivityIndicator color={colors.textMuted} style={{ marginVertical: 16 }} />
             ) : null
           }
