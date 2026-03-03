@@ -322,16 +322,21 @@ function monthRange(dateStr) {
   return { start, end };
 }
 
+function normalizeMonthStart(dateStr) {
+  const [y, m] = String(dateStr || "").split("-").map(Number);
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return todayStr().slice(0, 7) + "-01";
+  return `${y}-${String(m).padStart(2, "0")}-01`;
+}
+
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
 export default function HomeScreen({ navigation }) {
   const { colors: themeColors, themeTeamCode } = useTheme();
   const calendarShellColor = "#1F1F1F";
-  const themedCalendarKey = `${calendarKey}-${calendarShellColor}-${themeColors.textPrimary}`;
   const today = todayStr();
   const yesterday = yesterdayStr();
-  const [currentMonth, setCurrentMonth] = useState(today.slice(0, 7) + "-01");
-  const [calendarKey, setCalendarKey] = useState(0);
+  const [currentMonth, setCurrentMonth] = useState(normalizeMonthStart(today));
+  const themedCalendarKey = `${currentMonth}-${calendarShellColor}-${themeColors.textPrimary}`;
   const { setCurrentMonth: setContextMonth } = useCalendar();
   const [animDirection, setAnimDirection] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
@@ -474,8 +479,9 @@ export default function HomeScreen({ navigation }) {
   }
 
   function onMonthChange(month) {
-    setCurrentMonth(month.dateString);
-    loadCalendarDots(month.dateString);
+    const monthStart = normalizeMonthStart(month.dateString);
+    setCurrentMonth(monthStart);
+    loadCalendarDots(monthStart);
   }
 
   function openPicker() {
@@ -487,7 +493,6 @@ export default function HomeScreen({ navigation }) {
     setAnimDirection(dateStr > currentMonth ? "forward" : "backward");
     setCurrentMonth(dateStr);
     loadCalendarDots(dateStr);
-    setCalendarKey((k) => k + 1);
     setPickerVisible(false);
   }
 
@@ -505,7 +510,6 @@ export default function HomeScreen({ navigation }) {
     setAnimDirection(delta > 0 ? "forward" : "backward");
     setCurrentMonth(dateStr);
     loadCalendarDots(dateStr);
-    setCalendarKey((k) => k + 1);
   }
 
   const calendarSwipe = Gesture.Pan()
@@ -547,14 +551,21 @@ export default function HomeScreen({ navigation }) {
             minDate="2017-01-01"
             onDayPress={onDayPress}
             onMonthChange={onMonthChange}
+            onPressArrowLeft={() => goToMonth(-1)}
+            onPressArrowRight={() => goToMonth(1)}
             markedDates={markedDates}
             dayComponent={({ date, state, marking, onPress }) => {
               if (!date) return <View />;
               const isDisabled = state === "disabled";
               const isToday = date.dateString === today;
+              const yearNum = Number(date.year);
+              const isJackieRobinsonDay =
+                yearNum >= 2017 && Number(date.month) === 4 && Number(date.day) === 15;
               const textColor = isDisabled
                 ? themeColors.textMuted
                 : marking?.textColor || themeColors.textPrimary;
+              const dayLabel = isJackieRobinsonDay ? "42" : String(date.day);
+              const dayLabelColor = isJackieRobinsonDay ? "#005A9C" : textColor;
               return (
                 <TouchableOpacity
                   onPress={() => onPress(date)}
@@ -562,9 +573,21 @@ export default function HomeScreen({ navigation }) {
                   activeOpacity={0.6}
                   disabled={isDisabled}
                 >
-                  <View style={[styles.dayNumWrap, isToday && styles.dayNumWrapToday]}>
-                    <Text style={[styles.dayNum, { color: textColor }]}>
-                      {date.day}
+                  <View
+                    style={[
+                      styles.dayNumWrap,
+                      isToday && styles.dayNumWrapToday,
+                      isJackieRobinsonDay && styles.dayNumWrapJackie,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.dayNum,
+                        { color: dayLabelColor },
+                        isJackieRobinsonDay && styles.dayNumJackie,
+                      ]}
+                    >
+                      {dayLabel}
                     </Text>
                   </View>
                   {marking?.dots?.length > 0 && (
@@ -724,8 +747,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.today,
   },
+  dayNumWrapJackie: {
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1.5,
+    borderColor: "#005A9C",
+  },
   dayNum: {
     fontSize: 14,
+  },
+  dayNumJackie: {
+    fontSize: 13,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
   dayDots: {
     flexDirection: "row",
