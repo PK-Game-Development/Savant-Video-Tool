@@ -19,6 +19,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Animated,
+  Dimensions,
+  Easing,
 } from "react-native";
 import { Calendar } from "react-native-calendars";
 import { LinearGradient } from "expo-linear-gradient";
@@ -39,6 +42,8 @@ import MomentCard from "../components/MomentCard";
 import colors from "../constants/colors";
 import { teamName } from "../constants/teams";
 
+const SCREEN_W = Dimensions.get("window").width;
+
 // ─── Picker data ───────────────────────────────────────────────────────────────
 
 const ITEM_H = 48;
@@ -52,6 +57,35 @@ const YEAR_LIST = (() => {
   const y = new Date().getFullYear();
   return Array.from({ length: y - 2016 }, (_, i) => 2017 + i);
 })();
+
+// ─── Calendar slide-in wrapper ────────────────────────────────────────────────
+
+function CalendarSlide({ direction, swipeGesture, children }) {
+  const translateX = useRef(
+    new Animated.Value(
+      direction === "forward"  ?  SCREEN_W :
+      direction === "backward" ? -SCREEN_W : 0
+    )
+  ).current;
+
+  useEffect(() => {
+    if (!direction) return;
+    Animated.timing(translateX, {
+      toValue: 0,
+      duration: 280,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  return (
+    <GestureDetector gesture={swipeGesture}>
+      <Animated.View style={{ transform: [{ translateX }] }}>
+        {children}
+      </Animated.View>
+    </GestureDetector>
+  );
+}
 
 // ─── Drum-roll picker ──────────────────────────────────────────────────────────
 
@@ -275,6 +309,7 @@ export default function HomeScreen({ navigation }) {
   const today = todayStr();
   const [currentMonth, setCurrentMonth] = useState(today.slice(0, 7) + "-01");
   const [calendarKey, setCalendarKey] = useState(0);
+  const [animDirection, setAnimDirection] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [markedDates, setMarkedDates] = useState({});
   const [todayMoments, setTodayMoments] = useState([]);
@@ -380,6 +415,7 @@ export default function HomeScreen({ navigation }) {
 
   function confirmPicker(month, year) {
     const dateStr = `${year}-${String(month).padStart(2, "0")}-01`;
+    setAnimDirection(dateStr > currentMonth ? "forward" : "backward");
     setCurrentMonth(dateStr);
     loadCalendarDots(dateStr);
     setCalendarKey((k) => k + 1);
@@ -397,6 +433,7 @@ export default function HomeScreen({ navigation }) {
     const todayMon  = parseInt(today.slice(5, 7));
     if (ny > todayYear || (ny === todayYear && nm > todayMon)) return;
     const dateStr = `${ny}-${String(nm).padStart(2, "0")}-01`;
+    setAnimDirection(delta > 0 ? "forward" : "backward");
     setCurrentMonth(dateStr);
     loadCalendarDots(dateStr);
     setCalendarKey((k) => k + 1);
@@ -429,56 +466,61 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <GestureDetector gesture={calendarSwipe}>
-      <Calendar
-        key={calendarKey}
-        current={currentMonth}
-        minDate="2017-01-01"
-        onDayPress={onDayPress}
-        onMonthChange={onMonthChange}
-        markingType="multi-dot"
-        markedDates={markedDates}
-        renderHeader={() => (
-          <TouchableOpacity
-            onPress={openPicker}
-            style={styles.calendarHeaderBtn}
-            activeOpacity={0.7}
-            hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
-          >
-            <Text style={styles.calendarHeaderText}>
-              {MONTH_NAMES[displayMonth - 1]} {displayYear}
-            </Text>
-            <Ionicons
-              name="chevron-down"
-              size={13}
-              color={colors.textSecondary}
-              style={{ marginLeft: 5, marginTop: 1 }}
-            />
-          </TouchableOpacity>
-        )}
-        theme={{
-          backgroundColor: colors.background,
-          calendarBackground: colors.background,
-          textSectionTitleColor: colors.textMuted,
-          selectedDayBackgroundColor: colors.accent,
-          selectedDayTextColor: "#fff",
-          todayTextColor: colors.accent,
-          dayTextColor: colors.textPrimary,
-          textDisabledColor: colors.textMuted,
-          dotColor: colors.accent,
-          selectedDotColor: "#fff",
-          arrowColor: colors.textSecondary,
-          disabledArrowColor: colors.textMuted,
-          monthTextColor: colors.textPrimary,
-          indicatorColor: colors.accent,
-          textDayFontSize: 14,
-          textMonthFontSize: 16,
-          textDayHeaderFontSize: 11,
-          textMonthFontWeight: "300",
-        }}
-        style={styles.calendar}
-      />
-      </GestureDetector>
+      <View style={styles.calendarWrapper}>
+        <CalendarSlide
+          key={calendarKey}
+          direction={animDirection}
+          swipeGesture={calendarSwipe}
+        >
+          <Calendar
+            current={currentMonth}
+            minDate="2017-01-01"
+            onDayPress={onDayPress}
+            onMonthChange={onMonthChange}
+            markingType="multi-dot"
+            markedDates={markedDates}
+            renderHeader={() => (
+              <TouchableOpacity
+                onPress={openPicker}
+                style={styles.calendarHeaderBtn}
+                activeOpacity={0.7}
+                hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
+              >
+                <Text style={styles.calendarHeaderText}>
+                  {MONTH_NAMES[displayMonth - 1]} {displayYear}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={13}
+                  color={colors.textSecondary}
+                  style={{ marginLeft: 5, marginTop: 1 }}
+                />
+              </TouchableOpacity>
+            )}
+            theme={{
+              backgroundColor: colors.background,
+              calendarBackground: colors.background,
+              textSectionTitleColor: colors.textMuted,
+              selectedDayBackgroundColor: colors.accent,
+              selectedDayTextColor: "#fff",
+              todayTextColor: colors.accent,
+              dayTextColor: colors.textPrimary,
+              textDisabledColor: colors.textMuted,
+              dotColor: colors.accent,
+              selectedDotColor: "#fff",
+              arrowColor: colors.textSecondary,
+              disabledArrowColor: colors.textMuted,
+              monthTextColor: colors.textPrimary,
+              indicatorColor: colors.accent,
+              textDayFontSize: 14,
+              textMonthFontSize: 16,
+              textDayHeaderFontSize: 11,
+              textMonthFontWeight: "300",
+            }}
+            style={styles.calendar}
+          />
+        </CalendarSlide>
+      </View>
 
       {/* Auto-save strip */}
       <View style={styles.section}>
@@ -550,8 +592,12 @@ const styles = StyleSheet.create({
     fontWeight: "200",
     letterSpacing: 4,
   },
-  calendar: {
+  calendarWrapper: {
+    overflow: "hidden",
     marginHorizontal: 8,
+  },
+  calendar: {
+    marginHorizontal: 0,
   },
   calendarHeaderBtn: {
     flexDirection: "row",
