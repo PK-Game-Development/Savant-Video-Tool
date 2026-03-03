@@ -15,6 +15,7 @@ import OnboardingScreen from "../screens/OnboardingScreen";
 import HomeScreen from "../screens/HomeScreen";
 import DayScreen from "../screens/DayScreen";
 import AddMomentScreen from "../screens/AddMomentScreen";
+import GamePlaysScreen from "../screens/GamePlaysScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 
 const Stack = createNativeStackNavigator();
@@ -54,6 +55,7 @@ export default function AppNavigator() {
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Day" component={DayScreen} />
           <Stack.Screen name="AddMoment" component={AddMomentScreen} />
+          <Stack.Screen name="GamePlays" component={GamePlaysScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
         </Stack.Navigator>
       </NavigationContainer>

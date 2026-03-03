@@ -72,6 +72,28 @@ export async function getPlayerPlays(mlbId, date) {
   return get(`/api/player-plays?${params}`);
 }
 
+// ─── Games (scoreboards) ──────────────────────────────────────────────────────
+
+/**
+ * Get all games for a given date with scores and status.
+ * @param {string} date  YYYY-MM-DD
+ */
+export async function getGames(date) {
+  return get(`/api/games?date=${date}`);
+}
+
+// ─── Game plays ───────────────────────────────────────────────────────────────
+
+/**
+ * Get all completed at-bat plays for a specific game.
+ * @param {string} gamePk  MLB game ID
+ * @param {string} date    YYYY-MM-DD
+ */
+export async function getGamePlays(gamePk, date) {
+  const params = new URLSearchParams({ game_pk: String(gamePk), date });
+  return get(`/api/game-plays?${params}`);
+}
+
 // ─── Auto-Save Helper ─────────────────────────────────────────────────────────
 
 /**

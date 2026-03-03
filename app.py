@@ -127,6 +127,14 @@ _sorted_rows_cache = {}
 # Game feed cache: keyed by game_pk -> (play_map, matchup_map, duration_map)
 _game_feed_cache = {}
 
+# Games (schedule) cache: keyed by date -> (timestamp, data)
+_games_cache = {}
+_GAMES_CACHE_TTL = 120  # 2 minutes — scores update during live games
+
+# Game plays cache: keyed by game_pk -> (timestamp, data)
+_game_plays_cache = {}
+_GAME_PLAYS_CACHE_TTL = 120
+
 # MLB content API cache: keyed by game_pk -> list of highlight items
 _content_cache = {}
 
@@ -884,6 +892,161 @@ def api_highlights():
     }
     _highlights_cache[cache_key] = (time.time(), result)
     return jsonify(result)
+
+
+@app.route("/api/games", methods=["GET"])
+def api_games():
+    """Return all games for a given date with scores and status.
+
+    Query params:
+        date (str): YYYY-MM-DD. Required.
+    """
+    date_param = request.args.get("date", "").strip()
+    if not date_param:
+        return jsonify({"error": "date is required"}), 400
+
+    cached = _games_cache.get(date_param)
+    if cached:
+        cache_ts, data = cached
+        if time.time() - cache_ts < _GAMES_CACHE_TTL:
+            return jsonify(data)
+
+    session = create_session()
+    try:
+        resp = session.get(
+            MLB_SCHEDULE_URL.format(date=date_param) + "&hydrate=team,linescore",
+            timeout=15,
+        )
+        resp.raise_for_status()
+        schedule = resp.json()
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch schedule: {e}"}), 500
+
+    dates = schedule.get("dates", [])
+    games_out = []
+    for game in (dates[0].get("games", []) if dates else []):
+        status = game.get("status", {})
+        abstract_state = status.get("abstractGameState", "")
+        teams = game.get("teams", {})
+        away = teams.get("away", {})
+        home = teams.get("home", {})
+        linescore = game.get("linescore", {})
+
+        games_out.append({
+            "game_pk": str(game.get("gamePk", "")),
+            "status": status.get("detailedState", ""),
+            "abstract_state": abstract_state,
+            "inning": linescore.get("currentInningOrdinal", ""),
+            "inning_state": linescore.get("inningState", ""),
+            "away": {
+                "abbr": away.get("team", {}).get("abbreviation", ""),
+                "name": away.get("team", {}).get("teamName", ""),
+                "score": away.get("score"),
+            },
+            "home": {
+                "abbr": home.get("team", {}).get("abbreviation", ""),
+                "name": home.get("team", {}).get("teamName", ""),
+                "score": home.get("score"),
+            },
+        })
+
+    result = {"date": date_param, "games": games_out}
+    _games_cache[date_param] = (time.time(), result)
+    return jsonify(result)
+
+
+@app.route("/api/game-plays", methods=["GET"])
+def api_game_plays():
+    """Return all completed at-bat plays for a game, grouped-friendly for the iOS client.
+
+    Query params:
+        game_pk (str): MLB game ID. Required.
+        date    (str): YYYY-MM-DD. Used as the moment date when saving.
+    """
+    game_pk = request.args.get("game_pk", "").strip()
+    date_param = request.args.get("date", "").strip()
+    if not game_pk:
+        return jsonify({"error": "game_pk is required"}), 400
+
+    cached = _game_plays_cache.get(game_pk)
+    if cached:
+        cache_ts, data = cached
+        if time.time() - cache_ts < _GAME_PLAYS_CACHE_TTL:
+            return jsonify(data)
+
+    session = create_session()
+    try:
+        resp = session.get(MLB_GAME_FEED_URL.format(game_pk=game_pk), timeout=30)
+        resp.raise_for_status()
+        feed = resp.json()
+    except Exception as e:
+        return jsonify({"error": f"Failed to fetch game feed: {e}"}), 500
+
+    game_data = feed.get("gameData", {})
+    teams = game_data.get("teams", {})
+    home_abbr = teams.get("home", {}).get("abbreviation", "")
+    away_abbr = teams.get("away", {}).get("abbreviation", "")
+    official_date = date_param or game_data.get("datetime", {}).get("officialDate", "")
+
+    all_plays = feed.get("liveData", {}).get("plays", {}).get("allPlays", [])
+    plays_out = []
+    for play in all_plays:
+        result = play.get("result", {})
+        about = play.get("about", {})
+        matchup = play.get("matchup", {})
+
+        if not about.get("isComplete", False):
+            continue
+
+        event_type = result.get("eventType", "")
+        if not event_type:
+            continue
+
+        # Grab the last pitch/play event that has a playId
+        play_id = None
+        for pe in reversed(play.get("playEvents", [])):
+            pid = pe.get("playId", "")
+            if pid:
+                play_id = pid
+                break
+
+        if not play_id:
+            continue
+
+        half = about.get("halfInning", "top")
+        if half == "top":
+            batting_team, pitching_team = away_abbr, home_abbr
+        else:
+            batting_team, pitching_team = home_abbr, away_abbr
+
+        plays_out.append({
+            "play_id": play_id,
+            "game_pk": game_pk,
+            "date": official_date,
+            "player": matchup.get("batter", {}).get("fullName", ""),
+            "event": event_type,
+            "description": result.get("description", ""),
+            "inning": about.get("inning", 0),
+            "half_inning": half,
+            "is_scoring": about.get("isScoringPlay", False),
+            "batting_team": batting_team,
+            "pitching_team": pitching_team,
+            "away_score": result.get("awayScore", 0),
+            "home_score": result.get("homeScore", 0),
+            "away_abbr": away_abbr,
+            "home_abbr": home_abbr,
+            "savant_url": SPORTY_VIDEO_URL.format(play_id=play_id),
+        })
+
+    result_data = {
+        "game_pk": game_pk,
+        "date": official_date,
+        "away_abbr": away_abbr,
+        "home_abbr": home_abbr,
+        "plays": plays_out,
+    }
+    _game_plays_cache[game_pk] = (time.time(), result_data)
+    return jsonify(result_data)
 
 
 @app.route("/api/player-plays", methods=["GET"])

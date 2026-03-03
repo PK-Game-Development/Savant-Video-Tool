@@ -1,174 +1,127 @@
 /**
- * AddMomentScreen — browse plays for a given date and save one.
- *
- * Search modes:
- *   1. Default: top 15 WPA plays for the date (all teams)
- *   2. Team filter: top plays for the selected team
- *   3. Player search: type a name → pick a player → see their plays that day
+ * AddMomentScreen — shows scoreboard cards for every game on the selected date.
+ * Tap a game to browse its plays in GamePlaysScreen.
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  TextInput,
   FlatList,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Keyboard,
-  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { getHighlights, searchPlayers, getPlayerPlays } from "../services/savantApi";
-import { saveMoment, getSavedPlayIds } from "../services/moments";
-import { invalidateMoments, consumeHighlights } from "../services/prefetch";
-import PlayCard from "../components/PlayCard";
+import { getGames } from "../services/savantApi";
+import { teamByCode } from "../constants/teams";
 import colors from "../constants/colors";
-import { TEAMS } from "../constants/teams";
 
 function formatShortDate(dateStr) {
   const d = new Date(dateStr + "T12:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-export default function AddMomentScreen({ route, navigation }) {
-  const { date } = route.params;
+function ScoreboardCard({ game, onPress }) {
+  const awayTeam = teamByCode(game.away.abbr);
+  const homeTeam = teamByCode(game.home.abbr);
+  const awayColor = awayTeam?.color || colors.textMuted;
+  const homeColor = homeTeam?.color || colors.textMuted;
 
-  const [query, setQuery] = useState("");
-  const [mode, setMode] = useState("highlights"); // "highlights" | "player" | "team"
-  const [plays, setPlays] = useState([]);
-  const [displayCount, setDisplayCount] = useState(20);
-  const [playerResults, setPlayerResults] = useState([]);
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [selectedTeam, setSelectedTeam] = useState(null);
-  const [savedPlayIds, setSavedPlayIds] = useState(new Set());
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [saving, setSaving] = useState(null); // play_id being saved
-  const [showTeamPicker, setShowTeamPicker] = useState(false);
-  const playerSearchTimer = useRef(null);
-  const loadId = useRef(0);
+  const isLive = game.abstract_state === "Live";
+  const isFinal = game.abstract_state === "Final";
+  const isPreview = game.abstract_state === "Preview";
 
-  // Load default highlights and saved play IDs on mount
-  useEffect(() => {
-    loadHighlights();
-    getSavedPlayIds(date).then(setSavedPlayIds).catch(() => {});
-  }, [date]);
+  const awayWin = isFinal && game.away.score > game.home.score;
+  const homeWin = isFinal && game.home.score > game.away.score;
 
-  async function loadHighlights(team = null) {
-    const myId = ++loadId.current;
-    setLoading(true);
-    setLoadingMore(false);
-    setPlays([]);
-    setDisplayCount(20);
-
-    // Phase 1 — quick: fetch 6 plays and show them immediately.
-    getHighlights({ date, team, limit: 6 }).then((data) => {
-      if (loadId.current !== myId) return;
-      const videos = data?.videos || [];
-      if (videos.length) {
-        setPlays(videos);
-        setLoading(false);
-        setLoadingMore(true);
-      }
-    }).catch(() => {});
-
-    // Phase 2 — full: 50 plays (may hit prefetch cache from HomeScreen).
-    try {
-      const data = await consumeHighlights(date, team, () =>
-        getHighlights({ date, team, limit: 50 })
-      );
-      if (loadId.current !== myId) return;
-      setPlays(data?.videos || []);
-    } catch (err) {
-      if (loadId.current !== myId) return;
-      Alert.alert("Could not load plays", err.message);
-    } finally {
-      if (loadId.current === myId) {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    }
+  let statusText = game.status;
+  if (isLive && game.inning) {
+    statusText = `${game.inning_state?.charAt(0) || ""}${game.inning}`;
   }
 
-  // Debounced player search
-  useEffect(() => {
-    if (query.length < 2) {
-      setPlayerResults([]);
-      return;
-    }
-    clearTimeout(playerSearchTimer.current);
-    playerSearchTimer.current = setTimeout(async () => {
-      try {
-        const data = await searchPlayers(query);
-        setPlayerResults(data.players || []);
-      } catch {
-        setPlayerResults([]);
-      }
-    }, 300);
-    return () => clearTimeout(playerSearchTimer.current);
-  }, [query]);
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={onPress}
+      activeOpacity={0.75}
+      disabled={isPreview}
+    >
+      {/* Away team */}
+      <View style={styles.teamBlock}>
+        <View style={[styles.teamColorBar, { backgroundColor: awayColor }]} />
+        <Text style={[styles.abbr, !awayWin && isFinal && styles.abbrLoser]}>
+          {game.away.abbr}
+        </Text>
+        <Text style={[styles.teamName, !awayWin && isFinal && styles.teamNameLoser]}>
+          {game.away.name}
+        </Text>
+      </View>
 
-  async function selectPlayer(player) {
-    Keyboard.dismiss();
-    setSelectedPlayer(player);
-    setPlayerResults([]);
-    setQuery(player.name);
-    setMode("player");
+      {/* Scores + status */}
+      <View style={styles.center}>
+        {isPreview ? (
+          <Text style={styles.previewText}>Upcoming</Text>
+        ) : (
+          <View style={styles.scoreRow}>
+            <Text style={[styles.score, !awayWin && isFinal && styles.scoreDim]}>
+              {game.away.score ?? "—"}
+            </Text>
+            <Text style={styles.scoreDash}>–</Text>
+            <Text style={[styles.score, !homeWin && isFinal && styles.scoreDim]}>
+              {game.home.score ?? "—"}
+            </Text>
+          </View>
+        )}
+        <View style={[styles.statusBadge, isLive && styles.statusLive]}>
+          <Text style={[styles.statusText, isLive && styles.statusTextLive]}>
+            {isLive ? "● " : ""}{statusText}
+          </Text>
+        </View>
+      </View>
+
+      {/* Home team */}
+      <View style={[styles.teamBlock, styles.teamBlockRight]}>
+        <View style={[styles.teamColorBar, { backgroundColor: homeColor }]} />
+        <Text style={[styles.abbr, !homeWin && isFinal && styles.abbrLoser]}>
+          {game.home.abbr}
+        </Text>
+        <Text style={[styles.teamName, !homeWin && isFinal && styles.teamNameLoser]}>
+          {game.home.name}
+        </Text>
+      </View>
+
+      {!isPreview && (
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={styles.chevron} />
+      )}
+    </TouchableOpacity>
+  );
+}
+
+export default function AddMomentScreen({ route, navigation }) {
+  const { date } = route.params;
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    load();
+  }, [date]);
+
+  async function load() {
     setLoading(true);
-    setPlays([]);
     try {
-      const data = await getPlayerPlays(player.mlb_id, date);
-      setPlays(data.videos || []);
-      if ((data.videos || []).length === 0) {
-        Alert.alert("No plays found", `${player.name} didn't have a plate appearance on this date.`);
-      }
+      const data = await getGames(date);
+      setGames(data.games || []);
     } catch (err) {
-      Alert.alert("Error", err.message);
+      Alert.alert("Could not load games", err.message);
     } finally {
       setLoading(false);
     }
   }
 
-  function selectTeam(team) {
-    setSelectedTeam(team.code);
-    setShowTeamPicker(false);
-    setQuery("");
-    setSelectedPlayer(null);
-    setMode("team");
-    loadHighlights(team.code);
-  }
-
-  function clearSearch() {
-    setQuery("");
-    setSelectedPlayer(null);
-    setSelectedTeam(null);
-    setMode("highlights");
-    setPlayerResults([]);
-    setDisplayCount(20);
-    loadHighlights(null);
-  }
-
-  async function handleSave(video) {
-    setSaving(video.play_id);
-    try {
-      await saveMoment(video, { isAutoSaved: false, autoSaveType: null });
-      invalidateMoments(date);
-      setSavedPlayIds((prev) => new Set([...prev, video.play_id]));
-    } catch (err) {
-      Alert.alert("Error saving moment", err.message);
-    } finally {
-      setSaving(null);
-    }
-  }
-
-  const hasQuery = query.length >= 2 && !selectedPlayer;
-
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -183,112 +136,33 @@ export default function AddMomentScreen({ route, navigation }) {
         <View style={{ width: 26 }} />
       </View>
 
-      {/* Search bar */}
-      <View style={styles.searchRow}>
-        <View style={styles.searchBox}>
-          <Ionicons name="search" size={16} color={colors.textMuted} style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search player or team..."
-            placeholderTextColor={colors.textMuted}
-            value={query}
-            onChangeText={(t) => {
-              setQuery(t);
-              setSelectedPlayer(null);
-              if (t.length === 0) clearSearch();
-            }}
-            autoCorrect={false}
-            autoCapitalize="words"
-            returnKeyType="search"
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={clearSearch} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="close-circle" size={16} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          style={[styles.teamBtn, selectedTeam && styles.teamBtnActive]}
-          onPress={() => setShowTeamPicker(!showTeamPicker)}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.teamBtnText}>{selectedTeam || "Team"}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Team picker dropdown */}
-      {showTeamPicker && (
-        <View style={styles.teamPicker}>
-          <ScrollView style={{ maxHeight: 240 }} nestedScrollEnabled>
-            {TEAMS.map((t) => (
-              <TouchableOpacity
-                key={t.code}
-                style={styles.teamPickerRow}
-                onPress={() => selectTeam(t)}
-              >
-                <View style={[styles.teamPickerDot, { backgroundColor: t.color }]} />
-                <Text style={styles.teamPickerName}>{t.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-
-      {/* Player autocomplete dropdown */}
-      {hasQuery && playerResults.length > 0 && (
-        <View style={styles.playerDropdown}>
-          {playerResults.slice(0, 6).map((p) => (
-            <TouchableOpacity
-              key={p.mlb_id}
-              style={styles.playerRow}
-              onPress={() => selectPlayer(p)}
-            >
-              <Text style={styles.playerRowName}>{p.name}</Text>
-              <Text style={styles.playerRowMeta}>{p.position} · {p.team}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Section label */}
-      <Text style={styles.sectionLabel}>
-        {mode === "player" && selectedPlayer
-          ? selectedPlayer.name.toUpperCase()
-          : mode === "team" && selectedTeam
-          ? `${selectedTeam} · TOP PLAYS`
-          : "TOP PLAYS TODAY"}
-      </Text>
-
-      {/* Play list */}
       {loading ? (
         <ActivityIndicator color={colors.textSecondary} style={styles.loader} />
       ) : (
         <FlatList
-          style={styles.list}
-          data={plays.slice(0, displayCount)}
-          keyExtractor={(v) => v.play_id}
+          data={games}
+          keyExtractor={(g) => g.game_pk}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No games found for this date.</Text>
+          }
           renderItem={({ item }) => (
-            <PlayCard
-              video={item}
-              saved={savedPlayIds.has(item.play_id)}
-              onPress={() => handleSave(item)}
+            <ScoreboardCard
+              game={item}
+              onPress={() =>
+                navigation.navigate("GamePlays", {
+                  gamePk: item.game_pk,
+                  date,
+                  awayAbbr: item.away.abbr,
+                  homeAbbr: item.home.abbr,
+                  awayScore: item.away.score,
+                  homeScore: item.home.score,
+                  status: item.status,
+                })
+              }
             />
           )}
-          ListEmptyComponent={
-            <Text style={styles.empty}>No plays found for this date.</Text>
-          }
-          ListFooterComponent={
-            loadingMore ? (
-              <ActivityIndicator color={colors.textMuted} style={{ marginVertical: 16 }} />
-            ) : displayCount < plays.length ? (
-              <ActivityIndicator color={colors.textMuted} style={{ marginVertical: 16 }} />
-            ) : null
-          }
-          onEndReached={() => setDisplayCount((c) => c + 15)}
-          onEndReachedThreshold={0.4}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
         />
       )}
     </View>
@@ -310,9 +184,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerCenter: {
-    alignItems: "center",
-  },
+  headerCenter: { alignItems: "center" },
   headerTitle: {
     color: colors.textPrimary,
     fontSize: 16,
@@ -323,130 +195,106 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 2,
   },
-  searchRow: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 10,
-    alignItems: "center",
-  },
-  searchBox: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 10,
-    height: 40,
-  },
-  searchIcon: {
-    marginRight: 6,
-  },
-  searchInput: {
-    flex: 1,
-    color: colors.textPrimary,
-    fontSize: 14,
-  },
-  teamBtn: {
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    height: 40,
-    justifyContent: "center",
-  },
-  teamBtnActive: {
-    borderColor: colors.accent,
-  },
-  teamBtnText: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  teamPicker: {
-    position: "absolute",
-    top: 168,
-    right: 16,
-    width: 230,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    zIndex: 100,
-    shadowColor: "#000",
-    shadowOpacity: 0.6,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 10,
-  },
-  teamPickerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  teamPickerDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 10,
-  },
-  teamPickerName: {
-    color: colors.textPrimary,
-    fontSize: 13,
-  },
-  playerDropdown: {
-    marginHorizontal: 16,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 4,
-    zIndex: 50,
-  },
-  playerRow: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  playerRowName: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  playerRowMeta: {
-    color: colors.textSecondary,
-    fontSize: 11,
-    marginTop: 1,
-  },
-  sectionLabel: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: "600",
-    letterSpacing: 1.5,
-    paddingHorizontal: 16,
-    marginBottom: 10,
-    marginTop: 4,
-  },
-  list: {
-    flex: 1,
-  },
-  loader: {
-    marginTop: 60,
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-    flexGrow: 1,
-  },
+  loader: { marginTop: 60 },
+  list: { padding: 16 },
   empty: {
     color: colors.textMuted,
-    fontSize: 13,
+    fontSize: 14,
     textAlign: "center",
-    marginTop: 40,
+    marginTop: 60,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    overflow: "hidden",
+  },
+  teamBlock: {
+    flex: 1,
+    alignItems: "flex-start",
+  },
+  teamBlockRight: {
+    alignItems: "flex-end",
+  },
+  teamColorBar: {
+    width: 28,
+    height: 3,
+    borderRadius: 2,
+    marginBottom: 6,
+  },
+  abbr: {
+    color: colors.textPrimary,
+    fontSize: 22,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  abbrLoser: {
+    color: colors.textMuted,
+  },
+  teamName: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  teamNameLoser: {
+    color: colors.textMuted,
+  },
+  center: {
+    alignItems: "center",
+    paddingHorizontal: 12,
+  },
+  scoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  score: {
+    color: colors.textPrimary,
+    fontSize: 26,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+    minWidth: 28,
+    textAlign: "center",
+  },
+  scoreDim: {
+    color: colors.textMuted,
+  },
+  scoreDash: {
+    color: colors.textMuted,
+    fontSize: 18,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    backgroundColor: colors.surfaceElevated,
+  },
+  statusLive: {
+    backgroundColor: "#1a3a1a",
+  },
+  statusText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  statusTextLive: {
+    color: "#4CAF50",
+  },
+  previewText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontStyle: "italic",
+  },
+  chevron: {
+    marginLeft: 4,
   },
 });
