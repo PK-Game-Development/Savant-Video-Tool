@@ -1,30 +1,27 @@
 /**
- * MomentCard — displays a saved moment in DayScreen and HomeScreen auto-save strip.
- *
- * Props:
- *   moment       — Firestore moment object
- *   onPress      — optional tap handler
- *   onLongPress  — optional long-press (delete) handler
- *   compact      — if true, renders a smaller version for the auto-save strip
+ * MomentCard — displays a saved moment in DayScreen and SavedMomentsScreen.
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import colors from "../constants/colors";
-import { eventLabel, teamName } from "../constants/teams";
+import { eventLabel } from "../constants/teams";
+import { useTheme } from "../context/ThemeContext";
+import SituationGraphic from "./SituationGraphic";
+
+const MOMENT_BG = "#1F1F1F";
+
+function formatMomentDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 export default function MomentCard({ moment, onPress, onLongPress, compact = false }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const label = eventLabel(moment.event);
-  const wpaNum = parseFloat(moment.wpa) || 0;
-  const wpaSign = wpaNum >= 0 ? "+" : "";
-  const wpaColor = wpaNum > 0 ? "#4CAF50" : wpaNum < 0 ? colors.accent : colors.textSecondary;
-
-  const autoLabel =
-    moment.autoSaveType === "mlb"
-      ? "MLB"
-      : moment.autoSaveType === "team"
-      ? teamName(moment.battingTeam || moment.pitchingTeam)
-      : null;
+  const dateLabel = formatMomentDate(moment.date);
 
   if (compact) {
     return (
@@ -41,10 +38,8 @@ export default function MomentCard({ moment, onPress, onLongPress, compact = fal
           <Text style={styles.compactEvent} numberOfLines={1}>
             {label}
           </Text>
+          <Text style={styles.compactDate}>{dateLabel}</Text>
         </View>
-        <Text style={[styles.wpa, { color: wpaColor }]}>
-          {wpaSign}{wpaNum.toFixed(2)}
-        </Text>
       </TouchableOpacity>
     );
   }
@@ -56,118 +51,103 @@ export default function MomentCard({ moment, onPress, onLongPress, compact = fal
       onLongPress={onLongPress}
       activeOpacity={0.75}
     >
-      <View style={styles.cardTop}>
-        <View style={styles.cardLeft}>
-          <Text style={styles.playerName} numberOfLines={1}>
-            {moment.playerName}
-          </Text>
-          <Text style={styles.eventText} numberOfLines={1}>
-            {label}
-          </Text>
-        </View>
-        <Text style={[styles.wpa, { color: wpaColor }]}>
-          {wpaSign}{wpaNum.toFixed(2)}
+      <View style={styles.leftCol}>
+        <Text style={styles.playerName} numberOfLines={1}>
+          {moment.playerName}
         </Text>
+        <SituationGraphic moment={moment} colors={colors} />
       </View>
 
-      <View style={styles.cardBottom}>
+      <View style={styles.rightCol}>
+        <Text style={styles.eventText} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text style={styles.dateText}>{dateLabel}</Text>
         <Text style={styles.matchup} numberOfLines={1}>
           {moment.battingTeam} vs {moment.pitchingTeam}
         </Text>
-        {autoLabel && (
-          <View style={[
-            styles.badge,
-            { backgroundColor: moment.autoSaveType === "mlb" ? colors.autoSaveMlb : colors.autoSaveTeam }
-          ]}>
-            <Text style={styles.badgeText}>{autoLabel}</Text>
-          </View>
-        )}
+        {moment.description ? (
+          <Text style={styles.desc} numberOfLines={2}>
+            {moment.description}
+          </Text>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  cardTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 6,
-  },
-  cardLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
-  playerName: {
-    color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: "600",
-    marginBottom: 2,
-  },
-  eventText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-  },
-  wpa: {
-    fontSize: 17,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  cardBottom: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  matchup: {
-    color: colors.textMuted,
-    fontSize: 12,
-    flex: 1,
-  },
-  badge: {
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 8,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "700",
-  },
+function makeStyles(colors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: MOMENT_BG,
+      borderRadius: 10,
+      padding: 14,
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      flexDirection: "row",
+      gap: 12,
+    },
+    leftCol: {
+      width: 128,
+    },
+    rightCol: {
+      flex: 1,
+      justifyContent: "flex-start",
+    },
+    playerName: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    eventText: {
+      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: "600",
+      marginBottom: 2,
+    },
+    dateText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginBottom: 2,
+    },
+    matchup: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginBottom: 4,
+    },
+    desc: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+    },
 
-  // Compact (auto-save strip)
-  compactCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 8,
-  },
-  compactLeft: {
-    flex: 1,
-    marginRight: 10,
-  },
-  compactPlayer: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  compactEvent: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 1,
-  },
-});
+    compactCard: {
+      backgroundColor: MOMENT_BG,
+      borderRadius: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 8,
+    },
+    compactLeft: {
+      flex: 1,
+    },
+    compactPlayer: {
+      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    compactEvent: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginTop: 1,
+    },
+    compactDate: {
+      color: colors.textMuted,
+      fontSize: 11,
+      marginTop: 2,
+    },
+  });
+}

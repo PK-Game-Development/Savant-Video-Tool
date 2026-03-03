@@ -10,16 +10,19 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AppNavigator from "./src/navigation/AppNavigator";
 import { CalendarProvider } from "./src/context/CalendarContext";
+import { ThemeProvider } from "./src/context/ThemeContext";
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <CalendarProvider>
-          <StatusBar style="light" />
-          <AppNavigator />
-        </CalendarProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ThemeProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <CalendarProvider>
+            <StatusBar style="light" />
+            <AppNavigator />
+          </CalendarProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ThemeProvider>
   );
 }

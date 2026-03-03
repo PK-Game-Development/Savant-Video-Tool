@@ -28,6 +28,7 @@ import { auth, db } from "./firebase";
 // ─── Local (AsyncStorage) helpers ─────────────────────────────────────────────
 
 const LOCAL_KEY = "shorthop_moments";
+const LOCAL_PROFILE_KEY = "shorthop_profile";
 
 async function localGetAll() {
   const raw = await AsyncStorage.getItem(LOCAL_KEY);
@@ -42,14 +43,22 @@ async function localSaveAll(moments) {
 
 export async function getUserProfile() {
   const uid = auth.currentUser?.uid;
-  if (!uid) return null;
+  if (!uid) {
+    const raw = await AsyncStorage.getItem(LOCAL_PROFILE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }
   const snap = await getDoc(doc(db, "users", uid));
   return snap.exists() ? snap.data() : null;
 }
 
 export async function setUserProfile(data) {
   const uid = auth.currentUser?.uid;
-  if (!uid) throw new Error("Not authenticated");
+  const raw = await AsyncStorage.getItem(LOCAL_PROFILE_KEY);
+  const localProfile = raw ? JSON.parse(raw) : {};
+  const merged = Object.assign({}, localProfile, data);
+  await AsyncStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(merged));
+
+  if (!uid) return;
   await setDoc(doc(db, "users", uid), data, { merge: true });
 }
 
@@ -65,9 +74,16 @@ export async function saveMoment(video, { isAutoSaved = false, autoSaveType = nu
     playerName: video.player || video.batter_name || "",
     event: video.event,
     description: video.description || "",
-    wpa: parseFloat(video.wpa) || 0,
     battingTeam: video.batting_team || "",
     pitchingTeam: video.pitching_team || "",
+    inning: Number(video.inning) || 0,
+    halfInning: video.half_inning || "",
+    outs: Number(video.outs) || 0,
+    balls: Number(video.balls) || 0,
+    strikes: Number(video.strikes) || 0,
+    onFirst: Boolean(video.on_first),
+    onSecond: Boolean(video.on_second),
+    onThird: Boolean(video.on_third),
     savantUrl: video.savant_url || "",
     isAutoSaved,
     autoSaveType,

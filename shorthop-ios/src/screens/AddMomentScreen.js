@@ -3,7 +3,7 @@
  * Tap a game to browse its plays in GamePlaysScreen.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   View,
   Text,
@@ -16,14 +16,14 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { getGames } from "../services/savantApi";
 import { teamByCode } from "../constants/teams";
-import colors from "../constants/colors";
+import { useTheme } from "../context/ThemeContext";
 
 function formatShortDate(dateStr) {
   const d = new Date(dateStr + "T12:00:00");
   return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function ScoreboardCard({ game, onPress }) {
+function ScoreboardCard({ game, onPress, colors, styles }) {
   const awayTeam = teamByCode(game.away.abbr);
   const homeTeam = teamByCode(game.home.abbr);
   const awayColor = awayTeam?.color || colors.textMuted;
@@ -100,6 +100,8 @@ function ScoreboardCard({ game, onPress }) {
 }
 
 export default function AddMomentScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { date } = route.params;
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -150,6 +152,8 @@ export default function AddMomentScreen({ route, navigation }) {
           renderItem={({ item }) => (
             <ScoreboardCard
               game={item}
+              colors={colors}
+              styles={styles}
               onPress={() =>
                 navigation.navigate("GamePlays", {
                   gamePk: item.game_pk,
@@ -169,7 +173,8 @@ export default function AddMomentScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -297,4 +302,5 @@ const styles = StyleSheet.create({
   chevron: {
     marginLeft: 4,
   },
-});
+  });
+}

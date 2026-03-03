@@ -1,13 +1,8 @@
 /**
  * VideoMomentCard — moment card with video thumbnail and tap-to-play.
- *
- * Video is streamed through the Flask proxy (/api/stream) so the MLB CDN
- * headers are handled server-side rather than relying on iOS AVPlayer to
- * forward them.  The first frame is pulled via expo-video-thumbnails and
- * shown as a poster until the user taps play.
  */
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -21,15 +16,27 @@ import {
 import { VideoView, useVideoPlayer } from "expo-video";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { Ionicons } from "@expo/vector-icons";
-import colors from "../constants/colors";
 import { eventLabel } from "../constants/teams";
 import { API_BASE } from "../services/savantApi";
+import { useTheme } from "../context/ThemeContext";
+import SituationGraphic from "./SituationGraphic";
+
+const MOMENT_BG = "#1F1F1F";
+
+function formatMomentDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
 function proxyUrl(gamePk, playId) {
   return `${API_BASE}/api/stream/${playId}?game_pk=${gamePk}`;
 }
 
 export default function VideoMomentCard({ moment, onLongPress }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [active, setActive] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [thumbnail, setThumbnail] = useState(null);
@@ -41,7 +48,6 @@ export default function VideoMomentCard({ moment, onLongPress }) {
     p.muted = false;
   });
 
-  // Generate thumbnail from proxy stream on mount
   useEffect(() => {
     if (!moment.gamePk || !moment.playId) {
       setThumbLoading(false);
@@ -56,15 +62,16 @@ export default function VideoMomentCard({ moment, onLongPress }) {
         );
         if (!cancelled) setThumbnail(uri);
       } catch {
-        // no thumbnail — plain dark background is fine
+        // no thumbnail
       } finally {
         if (!cancelled) setThumbLoading(false);
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [moment.gamePk, moment.playId]);
 
-  // Status listener for play/error handling
   useEffect(() => {
     const sub = player.addListener("statusChange", ({ status, error }) => {
       if (status === "error" || error) {
@@ -84,28 +91,20 @@ export default function VideoMomentCard({ moment, onLongPress }) {
     didActivate.current = true;
     setHasError(false);
     setActive(true);
-    player
-      .replaceAsync({ uri: proxyUrl(moment.gamePk, moment.playId) })
-      .catch(() => setHasError(true));
+    player.replaceAsync({ uri: proxyUrl(moment.gamePk, moment.playId) }).catch(() => setHasError(true));
   }
 
   function openInBrowser() {
     if (moment.savantUrl) {
-      Linking.openURL(moment.savantUrl).catch(() =>
-        Alert.alert("Could not open link")
-      );
+      Linking.openURL(moment.savantUrl).catch(() => Alert.alert("Could not open link"));
     }
   }
 
   const label = eventLabel(moment.event);
-  const wpaNum = parseFloat(moment.wpa) || 0;
-  const wpaSign = wpaNum >= 0 ? "+" : "";
-  const wpaColor =
-    wpaNum > 0 ? "#4CAF50" : wpaNum < 0 ? colors.accent : colors.textSecondary;
+  const dateLabel = formatMomentDate(moment.date);
 
   return (
     <View style={styles.card}>
-      {/* 16:9 video area */}
       {active && !hasError ? (
         <View style={styles.videoArea}>
           <VideoView
@@ -123,14 +122,12 @@ export default function VideoMomentCard({ moment, onLongPress }) {
           onLongPress={onLongPress}
           activeOpacity={0.85}
         >
-          {/* Thumbnail or dark background */}
           {thumbnail ? (
             <Image source={{ uri: thumbnail }} style={styles.thumbnail} resizeMode="cover" />
           ) : (
             <View style={styles.thumbnailPlaceholder} />
           )}
 
-          {/* Overlay */}
           <View style={styles.overlay}>
             {hasError ? (
               <Ionicons name="alert-circle-outline" size={30} color={colors.textMuted} />
@@ -145,122 +142,131 @@ export default function VideoMomentCard({ moment, onLongPress }) {
         </TouchableOpacity>
       )}
 
-      {/* Metadata */}
-      <View style={styles.info}>
-        <View style={styles.infoTop}>
+      <View style={styles.infoRow}>
+        <View style={styles.leftCol}>
           <Text style={styles.playerName} numberOfLines={1}>
             {moment.playerName}
           </Text>
-          <Text style={[styles.wpa, { color: wpaColor }]}>
-            {wpaSign}{wpaNum.toFixed(2)}
-          </Text>
+          <SituationGraphic moment={moment} colors={colors} />
         </View>
-        <Text style={styles.eventText} numberOfLines={1}>
-          {label}
-          {moment.battingTeam
-            ? `  ·  ${moment.battingTeam} vs ${moment.pitchingTeam}`
-            : ""}
-        </Text>
-        {moment.description ? (
-          <Text style={styles.desc} numberOfLines={2}>
-            {moment.description}
+
+        <View style={styles.rightCol}>
+          <Text style={styles.eventText} numberOfLines={1}>
+            {label}
           </Text>
-        ) : null}
-        {moment.savantUrl ? (
-          <TouchableOpacity onPress={openInBrowser} style={styles.savantLink}>
-            <Ionicons
-              name="open-outline"
-              size={12}
-              color={colors.textMuted}
-              style={{ marginRight: 4 }}
-            />
-            <Text style={styles.savantLinkText}>View on Savant</Text>
-          </TouchableOpacity>
-        ) : null}
+          <Text style={styles.dateText}>{dateLabel}</Text>
+          <Text style={styles.matchup} numberOfLines={1}>
+            {moment.battingTeam} vs {moment.pitchingTeam}
+          </Text>
+          {moment.description ? (
+            <Text style={styles.desc} numberOfLines={2}>
+              {moment.description}
+            </Text>
+          ) : null}
+          {moment.savantUrl ? (
+            <TouchableOpacity onPress={openInBrowser} style={styles.savantLink}>
+              <Ionicons
+                name="open-outline"
+                size={12}
+                color={colors.textMuted}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.savantLinkText}>View on Savant</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 14,
-  },
-  videoArea: {
-    width: "100%",
-    aspectRatio: 16 / 9,
-    backgroundColor: "#000",
-  },
-  video: {
-    flex: 1,
-  },
-  thumbnail: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  thumbnailPlaceholder: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "#0d0d0d",
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.25)",
-  },
-  playButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.8)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  info: {
-    padding: 12,
-  },
-  infoTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 3,
-  },
-  playerName: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: "600",
-    flex: 1,
-    marginRight: 10,
-  },
-  wpa: {
-    fontSize: 16,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-  },
-  eventText: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    marginBottom: 3,
-  },
-  desc: {
-    color: colors.textMuted,
-    fontSize: 11,
-    lineHeight: 15,
-    marginTop: 2,
-  },
-  savantLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 6,
-  },
-  savantLinkText: {
-    color: colors.textMuted,
-    fontSize: 11,
-  },
-});
+function makeStyles(colors) {
+  return StyleSheet.create({
+    card: {
+      backgroundColor: MOMENT_BG,
+      borderRadius: 12,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 14,
+    },
+    videoArea: {
+      width: "100%",
+      aspectRatio: 16 / 9,
+      backgroundColor: "#000",
+    },
+    video: {
+      flex: 1,
+    },
+    thumbnail: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    thumbnailPlaceholder: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "#0d0d0d",
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "rgba(0,0,0,0.25)",
+    },
+    playButton: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: "rgba(0,0,0,0.55)",
+      borderWidth: 2,
+      borderColor: "rgba(255,255,255,0.8)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    infoRow: {
+      flexDirection: "row",
+      gap: 12,
+      padding: 12,
+    },
+    leftCol: {
+      width: 128,
+    },
+    rightCol: {
+      flex: 1,
+    },
+    playerName: {
+      color: colors.textPrimary,
+      fontSize: 15,
+      fontWeight: "600",
+    },
+    eventText: {
+      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: "600",
+      marginBottom: 2,
+    },
+    dateText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginBottom: 2,
+    },
+    matchup: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginBottom: 4,
+    },
+    desc: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      lineHeight: 17,
+      marginTop: 1,
+    },
+    savantLink: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: 6,
+    },
+    savantLinkText: {
+      color: colors.textMuted,
+      fontSize: 11,
+    },
+  });
+}

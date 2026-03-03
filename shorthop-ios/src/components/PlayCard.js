@@ -7,21 +7,25 @@
  *   onPress  — called when the card is tapped
  */
 
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import colors from "../constants/colors";
 import { eventLabel } from "../constants/teams";
+import { useTheme } from "../context/ThemeContext";
 
 export default function PlayCard({ video, saved = false, onPress }) {
+  const { colors: themeColors } = useTheme();
+  const styles = useMemo(() => makeStyles(themeColors), [themeColors]);
   const label = eventLabel(video.event);
-  const wpaNum = parseFloat(video.wpa) || 0;
-  const wpaSign = wpaNum >= 0 ? "+" : "";
-  const wpaColor = wpaNum > 0 ? "#4CAF50" : wpaNum < 0 ? colors.accent : colors.textSecondary;
 
   return (
     <TouchableOpacity
-      style={[styles.card, saved && styles.cardSaved]}
+      style={[
+        styles.card,
+        saved && styles.cardSaved,
+        saved && styles.themeCardSaved,
+        saved && { borderColor: themeColors.autoSaveTeam },
+      ]}
       onPress={onPress}
       activeOpacity={0.75}
       disabled={saved}
@@ -44,21 +48,18 @@ export default function PlayCard({ video, saved = false, onPress }) {
       </View>
 
       <View style={styles.right}>
-        <Text style={[styles.wpa, { color: wpaColor }]}>
-          {wpaSign}{wpaNum.toFixed(2)}
-        </Text>
         {saved ? (
           <Ionicons
             name="checkmark-circle"
             size={20}
-            color={colors.autoSaveTeam}
+            color={themeColors.autoSaveTeam}
             style={styles.icon}
           />
         ) : (
           <Ionicons
             name="add-circle-outline"
             size={20}
-            color={colors.textMuted}
+            color={themeColors.textMuted}
             style={styles.icon}
           />
         )}
@@ -67,7 +68,8 @@ export default function PlayCard({ video, saved = false, onPress }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
     borderRadius: 10,
@@ -82,6 +84,7 @@ const styles = StyleSheet.create({
     borderColor: colors.autoSaveTeam,
     opacity: 0.7,
   },
+  themeCardSaved: {},
   left: {
     flex: 1,
     marginRight: 12,
@@ -104,15 +107,11 @@ const styles = StyleSheet.create({
   },
   right: {
     alignItems: "flex-end",
-    justifyContent: "space-between",
-    minHeight: 44,
-  },
-  wpa: {
-    fontSize: 16,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
+    justifyContent: "center",
+    minHeight: 24,
   },
   icon: {
     marginTop: 8,
   },
-});
+  });
+}

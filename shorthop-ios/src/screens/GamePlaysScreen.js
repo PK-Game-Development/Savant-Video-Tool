@@ -3,7 +3,7 @@
  * Tap a play to save it as a moment.
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import { getGamePlays } from "../services/savantApi";
 import { saveMoment, getSavedPlayIds } from "../services/moments";
 import { invalidateMoments } from "../services/prefetch";
 import { teamByCode, eventLabel } from "../constants/teams";
-import colors from "../constants/colors";
+import { useTheme } from "../context/ThemeContext";
 
 const ORDINALS = ["", "1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th", "9th", "10th", "11th", "12th"];
 
@@ -26,7 +26,7 @@ function ordinal(n) {
   return ORDINALS[n] || `${n}th`;
 }
 
-function PlayRow({ play, saved, saving, onPress }) {
+function PlayRow({ play, saved, saving, onPress, colors, styles, highlighted }) {
   const label = eventLabel(play.event);
   const isHit = ["single", "double", "triple", "home_run"].includes(play.event);
   const isScore = play.is_scoring;
@@ -34,7 +34,7 @@ function PlayRow({ play, saved, saving, onPress }) {
 
   return (
     <TouchableOpacity
-      style={[styles.row, saved && styles.rowSaved]}
+      style={[styles.row, saved && styles.rowSaved, highlighted && styles.rowHighlighted]}
       onPress={onPress}
       activeOpacity={0.75}
       disabled={saved || saving}
@@ -61,7 +61,12 @@ function PlayRow({ play, saved, saving, onPress }) {
         {saving ? (
           <ActivityIndicator size="small" color={colors.textMuted} style={{ marginTop: 6 }} />
         ) : saved ? (
-          <Ionicons name="checkmark-circle" size={20} color={colors.autoSaveTeam} style={{ marginTop: 6 }} />
+          <Ionicons
+            name="checkmark-circle"
+            size={20}
+            color={colors.autoSaveTeam}
+            style={{ marginTop: 6 }}
+          />
         ) : (
           <Ionicons name="add-circle-outline" size={20} color={colors.textMuted} style={{ marginTop: 6 }} />
         )}
@@ -71,7 +76,11 @@ function PlayRow({ play, saved, saving, onPress }) {
 }
 
 export default function GamePlaysScreen({ route, navigation }) {
-  const { gamePk, date, awayAbbr, homeAbbr, awayScore, homeScore, status } = route.params;
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { gamePk, date, awayAbbr, homeAbbr, awayScore, homeScore, status, highlightPlayId } =
+    route.params;
+  const sectionListRef = useRef(null);
 
   const [sections, setSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,6 +94,30 @@ export default function GamePlaysScreen({ route, navigation }) {
     load();
     getSavedPlayIds(date).then(setSavedPlayIds).catch(() => {});
   }, [gamePk]);
+
+  useEffect(() => {
+    if (!highlightPlayId || sections.length === 0) return;
+    let targetSection = -1;
+    let targetItem = -1;
+    for (let s = 0; s < sections.length; s += 1) {
+      const idx = sections[s].data.findIndex((p) => p.play_id === highlightPlayId);
+      if (idx >= 0) {
+        targetSection = s;
+        targetItem = idx;
+        break;
+      }
+    }
+    if (targetSection < 0 || targetItem < 0) return;
+    const t = setTimeout(() => {
+      sectionListRef.current?.scrollToLocation?.({
+        sectionIndex: targetSection,
+        itemIndex: targetItem,
+        viewPosition: 0.5,
+        animated: true,
+      });
+    }, 120);
+    return () => clearTimeout(t);
+  }, [sections, highlightPlayId]);
 
   async function load() {
     setLoading(true);
@@ -161,8 +194,10 @@ export default function GamePlaysScreen({ route, navigation }) {
         <ActivityIndicator color={colors.textSecondary} style={styles.loader} />
       ) : (
         <SectionList
+          ref={sectionListRef}
           sections={sections}
           keyExtractor={(play) => play.play_id}
+          onScrollToIndexFailed={() => {}}
           stickySectionHeadersEnabled
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
@@ -174,8 +209,11 @@ export default function GamePlaysScreen({ route, navigation }) {
           renderItem={({ item }) => (
             <PlayRow
               play={item}
+              colors={colors}
+              styles={styles}
               saved={savedPlayIds.has(item.play_id)}
               saving={savingId === item.play_id}
+              highlighted={item.play_id === highlightPlayId}
               onPress={() => handleSave(item)}
             />
           )}
@@ -188,7 +226,8 @@ export default function GamePlaysScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -264,6 +303,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  rowHighlighted: {
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+    backgroundColor: colors.surfaceElevated,
+  },
   rowSaved: {
     opacity: 0.5,
   },
@@ -323,4 +367,5 @@ const styles = StyleSheet.create({
     marginTop: 60,
     paddingHorizontal: 32,
   },
-});
+  });
+}

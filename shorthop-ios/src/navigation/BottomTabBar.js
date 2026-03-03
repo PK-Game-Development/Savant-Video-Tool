@@ -1,8 +1,8 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
 import Svg, { Rect, Line, Polygon, Circle } from "react-native-svg";
 import { Ionicons } from "@expo/vector-icons";
-import colors from "../constants/colors";
+import { useTheme } from "../context/ThemeContext";
 
 const ACTIVE = "#999999";
 const INACTIVE = "#444444";
@@ -52,6 +52,8 @@ function BulletListIcon({ color, size }) {
 }
 
 export default function BottomTabBar({ state, navigation, insets }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const activeTab = state.routes[state.index].name;
   const bottomPad = Math.max(insets?.bottom ?? 0, 8);
 
@@ -88,17 +90,19 @@ export default function BottomTabBar({ state, navigation, insets }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: "row",
-    backgroundColor: colors.background,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  tab: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingTop: 12,
-  },
-});
+function makeStyles(colors) {
+  return StyleSheet.create({
+    container: {
+      flexDirection: "row",
+      backgroundColor: colors.background,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
+    },
+    tab: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingTop: 12,
+    },
+  });
+}

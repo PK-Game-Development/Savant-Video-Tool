@@ -1,12 +1,8 @@
 /**
- * HomeScreen — minimalist calendar with moment dots + today's auto-save strip.
+ * HomeScreen — minimalist calendar with moment dots + yesterday team preview.
  *
  * Calendar dots:
- *   Red dot  = MLB auto-save present
- *   Blue dot = Team auto-save present
  *   White dot = manually saved moment
- *
- * On mount / foreground: triggers auto-save check for today.
  */
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
@@ -33,17 +29,17 @@ import { auth } from "../services/firebase";
 import {
   getMomentsInRange,
   getMomentsForDate,
-  saveMoment,
   getUserProfile,
   recordLoginDate,
   getLoginDatesInRange,
 } from "../services/moments";
-import { getTopPlay, getHighlights } from "../services/savantApi";
+import { getHighlights, getGames, getGamePlays } from "../services/savantApi";
 import { prefetchMoments, prefetchHighlights } from "../services/prefetch";
 import MomentCard from "../components/MomentCard";
 import colors from "../constants/colors";
 import { teamName } from "../constants/teams";
 import { useCalendar } from "../context/CalendarContext";
+import { useTheme } from "../context/ThemeContext";
 
 const SCREEN_W = Dimensions.get("window").width;
 
@@ -92,7 +88,7 @@ function CalendarSlide({ direction, swipeGesture, children }) {
 
 // ─── Drum-roll picker ──────────────────────────────────────────────────────────
 
-function MonthYearPicker({ visible, initialMonth, initialYear, onConfirm, onCancel }) {
+function MonthYearPicker({ visible, initialMonth, initialYear, onConfirm, onCancel, themeColors }) {
   const [selMonth, setSelMonth] = useState(initialMonth);
   const [selYear, setSelYear] = useState(initialYear);
   const monthRef = useRef(null);
@@ -113,20 +109,20 @@ function MonthYearPicker({ visible, initialMonth, initialYear, onConfirm, onCanc
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
       <TouchableOpacity style={ps.backdrop} onPress={onCancel} activeOpacity={1} />
-      <View style={ps.sheet}>
+      <View style={[ps.sheet, { backgroundColor: themeColors.surfaceElevated }]}>
         {/* Toolbar */}
-        <View style={ps.toolbar}>
+        <View style={[ps.toolbar, { borderBottomColor: themeColors.border }]}>
           <TouchableOpacity
             onPress={onCancel}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={ps.cancel}>Cancel</Text>
+            <Text style={[ps.cancel, { color: themeColors.textSecondary }]}>Cancel</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => onConfirm(selMonth, selYear)}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={ps.done}>Done</Text>
+            <Text style={[ps.done, { color: themeColors.accent }]}>Done</Text>
           </TouchableOpacity>
         </View>
 
@@ -152,19 +148,26 @@ function MonthYearPicker({ visible, initialMonth, initialYear, onConfirm, onCanc
               }}
               renderItem={({ item, index }) => (
                 <View style={ps.item}>
-                  <Text style={[ps.itemText, index === selMonth - 1 && ps.itemSel]}>
+                  <Text
+                    style={[
+                      ps.itemText,
+                      { color: themeColors.textMuted },
+                      index === selMonth - 1 && ps.itemSel,
+                      index === selMonth - 1 && { color: themeColors.textPrimary },
+                    ]}
+                  >
                     {item}
                   </Text>
                 </View>
               )}
             />
             <LinearGradient
-              colors={[colors.surfaceElevated, "transparent"]}
+              colors={[themeColors.surfaceElevated, "transparent"]}
               style={ps.fadeTop}
               pointerEvents="none"
             />
             <LinearGradient
-              colors={["transparent", colors.surfaceElevated]}
+              colors={["transparent", themeColors.surfaceElevated]}
               style={ps.fadeBot}
               pointerEvents="none"
             />
@@ -188,19 +191,26 @@ function MonthYearPicker({ visible, initialMonth, initialYear, onConfirm, onCanc
               }}
               renderItem={({ item }) => (
                 <View style={ps.item}>
-                  <Text style={[ps.itemText, item === selYear && ps.itemSel]}>
+                  <Text
+                    style={[
+                      ps.itemText,
+                      { color: themeColors.textMuted },
+                      item === selYear && ps.itemSel,
+                      item === selYear && { color: themeColors.textPrimary },
+                    ]}
+                  >
                     {item}
                   </Text>
                 </View>
               )}
             />
             <LinearGradient
-              colors={[colors.surfaceElevated, "transparent"]}
+              colors={[themeColors.surfaceElevated, "transparent"]}
               style={ps.fadeTop}
               pointerEvents="none"
             />
             <LinearGradient
-              colors={["transparent", colors.surfaceElevated]}
+              colors={["transparent", themeColors.surfaceElevated]}
               style={ps.fadeBot}
               pointerEvents="none"
             />
@@ -298,6 +308,12 @@ function todayStr() {
   return new Date().toISOString().split("T")[0];
 }
 
+function yesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split("T")[0];
+}
+
 function monthRange(dateStr) {
   const [y, m] = dateStr.split("-").map(Number);
   const start = `${y}-${String(m).padStart(2, "0")}-01`;
@@ -309,15 +325,19 @@ function monthRange(dateStr) {
 // ─── Screen ────────────────────────────────────────────────────────────────────
 
 export default function HomeScreen({ navigation }) {
+  const { colors: themeColors } = useTheme();
+  const calendarShellColor = "#1F1F1F";
+  const themedCalendarKey = `${calendarKey}-${calendarShellColor}-${themeColors.textPrimary}`;
   const today = todayStr();
+  const yesterday = yesterdayStr();
   const [currentMonth, setCurrentMonth] = useState(today.slice(0, 7) + "-01");
   const [calendarKey, setCalendarKey] = useState(0);
   const { setCurrentMonth: setContextMonth } = useCalendar();
   const [animDirection, setAnimDirection] = useState(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [markedDates, setMarkedDates] = useState({});
-  const [todayMoments, setTodayMoments] = useState([]);
-  const [loadingAuto, setLoadingAuto] = useState(false);
+  const [previewMoments, setPreviewMoments] = useState([]);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const [profile, setProfile] = useState(null);
 
   const displayYear = parseInt(currentMonth.slice(0, 4));
@@ -333,13 +353,13 @@ export default function HomeScreen({ navigation }) {
     setContextMonth(currentMonth);
   }, [currentMonth]);
 
-  // Reload calendar dots and today's moments whenever the screen is focused
+  // Reload calendar dots and preview moments whenever the screen is focused
   useFocusEffect(
     useCallback(() => {
       recordLoginDate(today).catch(() => {});
       loadCalendarDots(currentMonth);
-      loadTodayMoments();
-    }, [currentMonth, profile])
+      loadPreviewMoments();
+    }, [currentMonth, profile, themeColors])
   );
 
   async function loadCalendarDots(monthStart) {
@@ -356,12 +376,7 @@ export default function HomeScreen({ navigation }) {
       // Moment dots per date
       for (const m of moments) {
         if (!marked[m.date]) marked[m.date] = { dots: [] };
-        const dotColor =
-          m.autoSaveType === "mlb"
-            ? colors.autoSaveMlb
-            : m.autoSaveType === "team"
-            ? colors.autoSaveTeam
-            : colors.manualSave;
+        const dotColor = colors.manualSave;
         if (!marked[m.date].dots.find((d) => d.color === dotColor)) {
           marked[m.date].dots.push({ color: dotColor });
         }
@@ -370,7 +385,7 @@ export default function HomeScreen({ navigation }) {
       // Days with both a login and a saved moment → red number
       for (const date of loginSet) {
         if (marked[date] && date !== today) {
-          marked[date].textColor = colors.accent;
+          marked[date].textColor = themeColors.accent;
         }
       }
 
@@ -384,41 +399,58 @@ export default function HomeScreen({ navigation }) {
     }
   }
 
-  async function loadTodayMoments() {
+  async function loadPreviewMoments() {
+    setLoadingPreview(true);
     try {
-      const moments = await getMomentsForDate(today);
-      setTodayMoments(moments);
-      const hasAutoSave = moments.some((m) => m.isAutoSaved);
-      if (!hasAutoSave && profile?.favoriteTeam) {
-        runAutoSave(profile.favoriteTeam);
-      } else if (!hasAutoSave && profile) {
-        runAutoSave(null);
+      if (!profile?.favoriteTeam) {
+        setPreviewMoments([]);
+        return;
       }
-    } catch {
-      setTodayMoments([]);
-    }
-  }
+      const gamesResp = await getGames(yesterday);
+      const games = gamesResp?.games || [];
+      const gameMap = new Map(games.map((g) => [String(g.game_pk), g]));
+      const relevantGames = games.filter(
+        (g) =>
+          g?.away?.abbr?.toUpperCase() === profile.favoriteTeam ||
+          g?.home?.abbr?.toUpperCase() === profile.favoriteTeam
+      );
 
-  async function runAutoSave(favoriteTeam) {
-    setLoadingAuto(true);
-    try {
-      const mlbPlay = await getTopPlay({ limit: 1 });
-      if (mlbPlay) {
-        await saveMoment(mlbPlay, { isAutoSaved: true, autoSaveType: "mlb" });
-      }
-      if (favoriteTeam) {
-        const teamPlay = await getTopPlay({ team: favoriteTeam, limit: 1 });
-        if (teamPlay && teamPlay.play_id !== mlbPlay?.play_id) {
-          await saveMoment(teamPlay, { isAutoSaved: true, autoSaveType: "team" });
-        }
-      }
-      const fresh = await getMomentsForDate(today);
-      setTodayMoments(fresh);
-      loadCalendarDots(currentMonth);
+      const playsByGame = await Promise.all(
+        relevantGames.map((g) => getGamePlays(g.game_pk, yesterday).catch(() => ({ plays: [] })))
+      );
+      const videos = playsByGame.flatMap((r) => r?.plays || []).slice(-8).reverse();
+
+      setPreviewMoments(
+        videos.map((v) => ({
+          id: `preview_${v.play_id}`,
+          date: yesterday,
+          playId: v.play_id,
+          gamePk: v.game_pk,
+          playerName: v.player || v.batter_name || "",
+          event: v.event,
+          description: v.description || "",
+          battingTeam: v.batting_team || "",
+          pitchingTeam: v.pitching_team || "",
+          inning: Number(v.inning) || 0,
+          halfInning: v.half_inning || "",
+          outs: Number(v.outs) || 0,
+          balls: Number(v.balls) || 0,
+          strikes: Number(v.strikes) || 0,
+          onFirst: Boolean(v.on_first),
+          onSecond: Boolean(v.on_second),
+          onThird: Boolean(v.on_third),
+          savantUrl: v.savant_url || "",
+          awayAbbr: gameMap.get(String(v.game_pk))?.away?.abbr || "",
+          homeAbbr: gameMap.get(String(v.game_pk))?.home?.abbr || "",
+          awayScore: gameMap.get(String(v.game_pk))?.away?.score,
+          homeScore: gameMap.get(String(v.game_pk))?.home?.score,
+          gameStatus: gameMap.get(String(v.game_pk))?.status || "",
+        }))
+      );
     } catch {
-      // Auto-save is best-effort
+      setPreviewMoments([]);
     } finally {
-      setLoadingAuto(false);
+      setLoadingPreview(false);
     }
   }
 
@@ -474,25 +506,32 @@ export default function HomeScreen({ navigation }) {
       else if (e.translationX > 40) goToMonth(-1);
     });
 
-  const autoSavedToday = todayMoments.filter((m) => m.isAutoSaved);
-
   return (
     <ScrollView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: themeColors.background }]}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <Text style={styles.wordmark}>shorthop</Text>
+        <Text style={[styles.wordmark, { color: themeColors.textPrimary }]}>shorthop</Text>
       </View>
 
-      <View style={styles.calendarWrapper}>
+      <View
+        style={[
+          styles.calendarWrapper,
+          {
+            backgroundColor: calendarShellColor,
+            borderColor: themeColors.accent,
+          },
+        ]}
+      >
         <CalendarSlide
-          key={calendarKey}
+          key={themedCalendarKey}
           direction={animDirection}
           swipeGesture={calendarSwipe}
         >
           <Calendar
+            key={themedCalendarKey}
             current={currentMonth}
             minDate="2017-01-01"
             onDayPress={onDayPress}
@@ -503,8 +542,8 @@ export default function HomeScreen({ navigation }) {
               const isDisabled = state === "disabled";
               const isToday = date.dateString === today;
               const textColor = isDisabled
-                ? colors.textMuted
-                : marking?.textColor || colors.textPrimary;
+                ? themeColors.textMuted
+                : marking?.textColor || themeColors.textPrimary;
               return (
                 <TouchableOpacity
                   onPress={() => onPress(date)}
@@ -537,24 +576,24 @@ export default function HomeScreen({ navigation }) {
                 activeOpacity={0.7}
                 hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
               >
-                <Text style={styles.calendarHeaderText}>
+                <Text style={[styles.calendarHeaderText, { color: themeColors.textPrimary }]}>
                   {MONTH_NAMES[displayMonth - 1]} {displayYear}
                 </Text>
                 <Ionicons
                   name="chevron-down"
                   size={13}
-                  color={colors.textSecondary}
+                  color={themeColors.textSecondary}
                   style={{ marginLeft: 5, marginTop: 1 }}
                 />
               </TouchableOpacity>
             )}
             theme={{
-              backgroundColor: colors.background,
-              calendarBackground: colors.background,
-              textSectionTitleColor: colors.textMuted,
-              arrowColor: colors.textSecondary,
-              disabledArrowColor: colors.textMuted,
-              monthTextColor: colors.textPrimary,
+              backgroundColor: calendarShellColor,
+              calendarBackground: calendarShellColor,
+              textSectionTitleColor: themeColors.textMuted,
+              arrowColor: themeColors.textSecondary,
+              disabledArrowColor: themeColors.textMuted,
+              monthTextColor: themeColors.textPrimary,
               textDayHeaderFontSize: 11,
               textMonthFontSize: 16,
               textMonthFontWeight: "300",
@@ -564,38 +603,49 @@ export default function HomeScreen({ navigation }) {
         </CalendarSlide>
       </View>
 
-      {/* Auto-save strip */}
+      {/* Favorite team preview strip */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>TODAY'S AUTO-SAVES</Text>
-          {loadingAuto && (
-            <ActivityIndicator size="small" color={colors.textMuted} />
+          <Text style={[styles.sectionTitle, { color: themeColors.textMuted }]}>
+            YESTERDAY'S TEAM PREVIEW
+          </Text>
+          {loadingPreview && (
+            <ActivityIndicator size="small" color={themeColors.textMuted} />
           )}
         </View>
 
-        {autoSavedToday.length === 0 && !loadingAuto && (
-          <Text style={styles.empty}>
-            {new Date().getHours() < 8
-              ? "Check back this morning — clips post after games go final."
-              : "No data yet for today. Check back later."}
+        {!profile?.favoriteTeam && !loadingPreview && (
+          <Text style={[styles.empty, { color: themeColors.textMuted }]}>
+            Pick a favorite team in Profile to see yesterday's preview moments.
           </Text>
         )}
 
-        {autoSavedToday.map((moment) => (
+        {profile?.favoriteTeam && previewMoments.length === 0 && !loadingPreview && (
+          <Text style={[styles.empty, { color: themeColors.textMuted }]}>
+            No preview moments found for {teamName(profile.favoriteTeam)} on {yesterday}.
+          </Text>
+        )}
+
+        {previewMoments.map((moment) => (
           <View key={moment.id}>
-            {moment.autoSaveType && (
-              <Text style={styles.autoSaveLabel}>
-                {moment.autoSaveType === "mlb"
-                  ? "MLB"
-                  : profile?.favoriteTeam
-                  ? teamName(profile.favoriteTeam)
-                  : "Your Team"}
-              </Text>
-            )}
+            <Text style={[styles.autoSaveLabel, { color: themeColors.textMuted }]}>
+              {teamName(profile?.favoriteTeam || "")}
+            </Text>
             <MomentCard
               moment={moment}
               compact
-              onPress={() => navigation.navigate("Day", { date: today })}
+              onPress={() =>
+                navigation.navigate("GamePlays", {
+                  gamePk: moment.gamePk,
+                  date: moment.date,
+                  awayAbbr: moment.awayAbbr,
+                  homeAbbr: moment.homeAbbr,
+                  awayScore: moment.awayScore,
+                  homeScore: moment.homeScore,
+                  status: moment.gameStatus,
+                  highlightPlayId: moment.playId,
+                })
+              }
             />
           </View>
         ))}
@@ -607,6 +657,7 @@ export default function HomeScreen({ navigation }) {
         initialYear={displayYear}
         onConfirm={confirmPicker}
         onCancel={() => setPickerVisible(false)}
+        themeColors={themeColors}
       />
     </ScrollView>
   );
@@ -637,6 +688,10 @@ const styles = StyleSheet.create({
   calendarWrapper: {
     overflow: "hidden",
     marginHorizontal: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
   },
   calendar: {
     marginHorizontal: 0,

@@ -16,9 +16,11 @@ import {
 import { setUserProfile } from "../services/moments";
 import { auth } from "../services/firebase";
 import { TEAMS } from "../constants/teams";
-import colors from "../constants/colors";
+import staticColors from "../constants/colors";
+import { useTheme } from "../context/ThemeContext";
 
 export default function OnboardingScreen({ navigation }) {
+  const { colors: themeColors } = useTheme();
   const [selected, setSelected] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -55,7 +57,7 @@ export default function OnboardingScreen({ navigation }) {
           {item.name}
         </Text>
         {isSelected && (
-          <View style={styles.check}>
+          <View style={[styles.check, { backgroundColor: themeColors.accent }]}>
             <Text style={styles.checkmark}>✓</Text>
           </View>
         )}
@@ -80,7 +82,11 @@ export default function OnboardingScreen({ navigation }) {
       />
 
       <TouchableOpacity
-        style={[styles.continueBtn, !selected && styles.continueBtnDisabled]}
+        style={[
+          styles.continueBtn,
+          { backgroundColor: themeColors.accent },
+          !selected && styles.continueBtnDisabled,
+        ]}
         onPress={handleContinue}
         disabled={!selected || saving}
         activeOpacity={0.85}
@@ -98,19 +104,19 @@ export default function OnboardingScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: staticColors.background,
     paddingHorizontal: 20,
     paddingTop: 60,
   },
   heading: {
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     fontSize: 28,
     fontWeight: "300",
     letterSpacing: 1,
     marginBottom: 8,
   },
   sub: {
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 14,
     marginBottom: 24,
   },
@@ -128,8 +134,8 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   teamRowSelected: {
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: staticColors.border,
+    backgroundColor: staticColors.surface,
   },
   teamDot: {
     width: 10,
@@ -138,19 +144,18 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   teamName: {
-    color: colors.textSecondary,
+    color: staticColors.textSecondary,
     fontSize: 15,
     flex: 1,
   },
   teamNameSelected: {
-    color: colors.textPrimary,
+    color: staticColors.textPrimary,
     fontWeight: "500",
   },
   check: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.accent,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -160,7 +165,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   continueBtn: {
-    backgroundColor: colors.accent,
     borderRadius: 10,
     paddingVertical: 15,
     alignItems: "center",

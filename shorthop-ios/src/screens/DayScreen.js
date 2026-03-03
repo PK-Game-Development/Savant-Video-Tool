@@ -3,7 +3,7 @@
  * Swipe left on a card to reveal the delete button.
  */
 
-import React, { useState, useCallback, useRef } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -21,7 +21,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { getMomentsForDate, deleteMoment } from "../services/moments";
 import { consumeMoments, invalidateMoments } from "../services/prefetch";
 import VideoMomentCard from "../components/VideoMomentCard";
-import colors from "../constants/colors";
+import { useTheme } from "../context/ThemeContext";
 
 if (Platform.OS === "android") {
   UIManager.setLayoutAnimationEnabledExperimental?.(true);
@@ -52,7 +52,7 @@ function TrashIcon() {
 
 // ─── Swipeable wrapper ────────────────────────────────────────────────────────
 
-function SwipeableMomentCard({ moment, onDelete }) {
+function SwipeableMomentCard({ moment, onDelete, styles }) {
   const swipeRef = useRef(null);
 
   function renderRightActions() {
@@ -86,6 +86,8 @@ function SwipeableMomentCard({ moment, onDelete }) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DayScreen({ route, navigation }) {
+  const { colors: themeColors } = useTheme();
+  const styles = useMemo(() => makeStyles(themeColors), [themeColors]);
   const { date } = route.params;
   const [moments, setMoments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -157,7 +159,7 @@ export default function DayScreen({ route, navigation }) {
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={26} color={colors.textPrimary} />
+          <Ionicons name="chevron-back" size={26} color={themeColors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.dateTitle}>{formatHeaderDate(date)}</Text>
         <View style={{ width: 26 }} />
@@ -169,6 +171,7 @@ export default function DayScreen({ route, navigation }) {
         renderItem={({ item }) => (
           <SwipeableMomentCard
             moment={item}
+            styles={styles}
             onDelete={() => handleDelete(item)}
           />
         )}
@@ -178,8 +181,8 @@ export default function DayScreen({ route, navigation }) {
       />
 
       <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => navigation.navigate("AddMoment", { date })}
+        style={[styles.addButton, { backgroundColor: themeColors.accent }]}
+        onPress={() => navigation.push("AddMoment", { date })}
         activeOpacity={0.85}
       >
         <Ionicons name="add" size={20} color="#fff" style={{ marginRight: 6 }} />
@@ -190,7 +193,8 @@ export default function DayScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(colors) {
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -246,4 +250,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-});
+  });
+}
