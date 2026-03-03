@@ -49,7 +49,7 @@ const MONTH_NAMES = [
 ];
 const YEAR_LIST = (() => {
   const y = new Date().getFullYear();
-  return Array.from({ length: y - 2015 }, (_, i) => 2016 + i);
+  return Array.from({ length: y - 2016 }, (_, i) => 2017 + i);
 })();
 
 // ─── Drum-roll picker ──────────────────────────────────────────────────────────
@@ -406,7 +406,7 @@ export default function HomeScreen({ navigation }) {
       <Calendar
         key={calendarKey}
         current={currentMonth}
-        minDate="2016-01-01"
+        minDate="2017-01-01"
         onDayPress={onDayPress}
         onMonthChange={onMonthChange}
         markingType="multi-dot"
