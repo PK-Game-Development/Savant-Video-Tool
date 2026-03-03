@@ -35,6 +35,7 @@ export default function VideoMomentCard({ moment, onLongPress }) {
 
   const player = useVideoPlayer(null, (p) => {
     p.loop = false;
+    p.muted = true;
   });
 
   // Attach listener at mount so no status events are ever missed.
