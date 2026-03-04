@@ -67,6 +67,7 @@ VIDEO_CDN_URL = "https://fastball-clips.mlb.com/{game_pk}/{broadcast}/{play_id}.
 SPORTY_VIDEO_URL = "https://baseballsavant.mlb.com/sporty-videos?playId={play_id}"
 MLB_PLAYER_SEARCH_URL = "https://statsapi.mlb.com/api/v1/people/search?names={name}&hydrate=currentTeam,xrefId"
 MLB_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date}"
+WBC_SCHEDULE_URL = "https://statsapi.mlb.com/api/v1/schedule?sportId=51&date={date}"
 
 # MLB team ID -> Fangraphs depth chart slug (team nickname only)
 FANGRAPHS_TEAM_SLUGS = {
@@ -912,19 +913,48 @@ def api_games():
             return jsonify(data)
 
     session = create_session()
-    try:
-        resp = session.get(
-            MLB_SCHEDULE_URL.format(date=date_param) + "&hydrate=team,linescore",
-            timeout=15,
-        )
-        resp.raise_for_status()
-        schedule = resp.json()
-    except Exception as e:
-        return jsonify({"error": f"Failed to fetch schedule: {e}"}), 500
+    schedule_urls = [MLB_SCHEDULE_URL, WBC_SCHEDULE_URL]
+    all_games = []
 
-    dates = schedule.get("dates", [])
+    for schedule_url in schedule_urls:
+        try:
+            resp = session.get(
+                schedule_url.format(date=date_param) + "&hydrate=team,linescore",
+                timeout=15,
+            )
+            resp.raise_for_status()
+            schedule = resp.json()
+        except Exception:
+            # Keep MLB behavior resilient: if one source fails, still return the other.
+            continue
+
+        dates = schedule.get("dates", [])
+        all_games.extend(dates[0].get("games", []) if dates else [])
+
+    if not all_games:
+        return jsonify({"error": "Failed to fetch schedule"}), 500
+
+    # Deduplicate by gamePk in case an upstream source overlaps.
+    game_map = {}
+    for game in all_games:
+        game_pk = str(game.get("gamePk", ""))
+        if game_pk:
+            game_map[game_pk] = game
+
+    def _team_abbr(team_obj):
+        # WBC/international teams may not always expose MLB-style abbreviation.
+        return (
+            team_obj.get("abbreviation")
+            or team_obj.get("fileCode", "").upper()
+            or team_obj.get("teamCode", "").upper()
+            or team_obj.get("name", "")[:3].upper()
+        )
+
     games_out = []
-    for game in (dates[0].get("games", []) if dates else []):
+    for game in sorted(
+        game_map.values(),
+        key=lambda g: (g.get("gameDate") or "", str(g.get("gamePk", ""))),
+    ):
         status = game.get("status", {})
         abstract_state = status.get("abstractGameState", "")
         teams = game.get("teams", {})
@@ -939,13 +969,13 @@ def api_games():
             "inning": linescore.get("currentInningOrdinal", ""),
             "inning_state": linescore.get("inningState", ""),
             "away": {
-                "abbr": away.get("team", {}).get("abbreviation", ""),
-                "name": away.get("team", {}).get("teamName", ""),
+                "abbr": _team_abbr(away.get("team", {})),
+                "name": away.get("team", {}).get("teamName", "") or away.get("team", {}).get("name", ""),
                 "score": away.get("score"),
             },
             "home": {
-                "abbr": home.get("team", {}).get("abbreviation", ""),
-                "name": home.get("team", {}).get("teamName", ""),
+                "abbr": _team_abbr(home.get("team", {})),
+                "name": home.get("team", {}).get("teamName", "") or home.get("team", {}).get("name", ""),
                 "score": home.get("score"),
             },
         })
